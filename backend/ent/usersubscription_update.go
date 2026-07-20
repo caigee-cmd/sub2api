@@ -85,6 +85,33 @@ func (_u *UserSubscriptionUpdate) SetNillableGroupID(v *int64) *UserSubscription
 	return _u
 }
 
+// SetPlanID sets the "plan_id" field.
+func (_u *UserSubscriptionUpdate) SetPlanID(v int64) *UserSubscriptionUpdate {
+	_u.mutation.ResetPlanID()
+	_u.mutation.SetPlanID(v)
+	return _u
+}
+
+// SetNillablePlanID sets the "plan_id" field if the given value is not nil.
+func (_u *UserSubscriptionUpdate) SetNillablePlanID(v *int64) *UserSubscriptionUpdate {
+	if v != nil {
+		_u.SetPlanID(*v)
+	}
+	return _u
+}
+
+// AddPlanID adds value to the "plan_id" field.
+func (_u *UserSubscriptionUpdate) AddPlanID(v int64) *UserSubscriptionUpdate {
+	_u.mutation.AddPlanID(v)
+	return _u
+}
+
+// ClearPlanID clears the value of the "plan_id" field.
+func (_u *UserSubscriptionUpdate) ClearPlanID() *UserSubscriptionUpdate {
+	_u.mutation.ClearPlanID()
+	return _u
+}
+
 // SetStartsAt sets the "starts_at" field.
 func (_u *UserSubscriptionUpdate) SetStartsAt(v time.Time) *UserSubscriptionUpdate {
 	_u.mutation.SetStartsAt(v)
@@ -471,6 +498,15 @@ func (_u *UserSubscriptionUpdate) sqlSave(ctx context.Context) (_node int, err e
 	if _u.mutation.DeletedAtCleared() {
 		_spec.ClearField(usersubscription.FieldDeletedAt, field.TypeTime)
 	}
+	if value, ok := _u.mutation.PlanID(); ok {
+		_spec.SetField(usersubscription.FieldPlanID, field.TypeInt64, value)
+	}
+	if value, ok := _u.mutation.AddedPlanID(); ok {
+		_spec.AddField(usersubscription.FieldPlanID, field.TypeInt64, value)
+	}
+	if _u.mutation.PlanIDCleared() {
+		_spec.ClearField(usersubscription.FieldPlanID, field.TypeInt64)
+	}
 	if value, ok := _u.mutation.StartsAt(); ok {
 		_spec.SetField(usersubscription.FieldStartsAt, field.TypeTime, value)
 	}
@@ -728,6 +764,33 @@ func (_u *UserSubscriptionUpdateOne) SetNillableGroupID(v *int64) *UserSubscript
 	if v != nil {
 		_u.SetGroupID(*v)
 	}
+	return _u
+}
+
+// SetPlanID sets the "plan_id" field.
+func (_u *UserSubscriptionUpdateOne) SetPlanID(v int64) *UserSubscriptionUpdateOne {
+	_u.mutation.ResetPlanID()
+	_u.mutation.SetPlanID(v)
+	return _u
+}
+
+// SetNillablePlanID sets the "plan_id" field if the given value is not nil.
+func (_u *UserSubscriptionUpdateOne) SetNillablePlanID(v *int64) *UserSubscriptionUpdateOne {
+	if v != nil {
+		_u.SetPlanID(*v)
+	}
+	return _u
+}
+
+// AddPlanID adds value to the "plan_id" field.
+func (_u *UserSubscriptionUpdateOne) AddPlanID(v int64) *UserSubscriptionUpdateOne {
+	_u.mutation.AddPlanID(v)
+	return _u
+}
+
+// ClearPlanID clears the value of the "plan_id" field.
+func (_u *UserSubscriptionUpdateOne) ClearPlanID() *UserSubscriptionUpdateOne {
+	_u.mutation.ClearPlanID()
 	return _u
 }
 
@@ -1146,6 +1209,15 @@ func (_u *UserSubscriptionUpdateOne) sqlSave(ctx context.Context) (_node *UserSu
 	}
 	if _u.mutation.DeletedAtCleared() {
 		_spec.ClearField(usersubscription.FieldDeletedAt, field.TypeTime)
+	}
+	if value, ok := _u.mutation.PlanID(); ok {
+		_spec.SetField(usersubscription.FieldPlanID, field.TypeInt64, value)
+	}
+	if value, ok := _u.mutation.AddedPlanID(); ok {
+		_spec.AddField(usersubscription.FieldPlanID, field.TypeInt64, value)
+	}
+	if _u.mutation.PlanIDCleared() {
+		_spec.ClearField(usersubscription.FieldPlanID, field.TypeInt64)
 	}
 	if value, ok := _u.mutation.StartsAt(); ok {
 		_spec.SetField(usersubscription.FieldStartsAt, field.TypeTime, value)

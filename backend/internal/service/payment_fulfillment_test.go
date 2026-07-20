@@ -627,7 +627,7 @@ func TestAlreadyProcessedRecoversStaleRechargingLease(t *testing.T) {
 	svc := &PaymentService{
 		entClient:       client,
 		groupRepo:       groupRepo,
-		subscriptionSvc: NewSubscriptionService(groupRepo, userSubRepoNoop{}, nil, nil, nil),
+		subscriptionSvc: NewSubscriptionService(groupRepo, userSubRepoNoop{}, nil, nil, nil, nil),
 	}
 
 	require.NoError(t, svc.alreadyProcessed(ctx, order))
@@ -728,7 +728,7 @@ func TestExecuteSubscriptionFulfillmentRecoversCommittedAssignmentWithoutExtendi
 	svc := &PaymentService{
 		entClient:       client,
 		groupRepo:       groupRepo,
-		subscriptionSvc: NewSubscriptionService(groupRepo, subRepo, nil, nil, nil),
+		subscriptionSvc: NewSubscriptionService(groupRepo, subRepo, nil, nil, nil, nil),
 	}
 
 	require.NoError(t, svc.ExecuteSubscriptionFulfillment(ctx, order.ID))
@@ -875,7 +875,7 @@ func TestExecuteSubscriptionFulfillmentAppliesAffiliateRebate(t *testing.T) {
 	subRepo := newSubscriptionUserSubRepoStub()
 	subscriptionSvc := NewSubscriptionService(&subscriptionGroupRepoStub{
 		group: &Group{ID: 7, Status: payment.EntityStatusActive, SubscriptionType: SubscriptionTypeSubscription},
-	}, subRepo, nil, nil, nil)
+	}, subRepo, nil, nil, nil, nil)
 	svc := &PaymentService{
 		entClient:        client,
 		groupRepo:        &subscriptionGroupRepoStub{group: &Group{ID: 7, Status: payment.EntityStatusActive, SubscriptionType: SubscriptionTypeSubscription}},
@@ -974,7 +974,7 @@ func TestExecuteSubscriptionFulfillmentDoesNotDuplicateWorkAfterLegacySuccessAud
 	subRepo := newSubscriptionUserSubRepoStub()
 	subscriptionSvc := NewSubscriptionService(&subscriptionGroupRepoStub{
 		group: &Group{ID: 7, Status: payment.EntityStatusActive, SubscriptionType: SubscriptionTypeSubscription},
-	}, subRepo, nil, nil, nil)
+	}, subRepo, nil, nil, nil, nil)
 	svc := &PaymentService{
 		entClient:        client,
 		groupRepo:        &subscriptionGroupRepoStub{group: &Group{ID: 7, Status: payment.EntityStatusActive, SubscriptionType: SubscriptionTypeSubscription}},

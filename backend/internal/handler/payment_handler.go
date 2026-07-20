@@ -226,6 +226,9 @@ type CreateOrderRequest struct {
 	PaymentSource     string  `json:"payment_source"`
 	OrderType         string  `json:"order_type"`
 	PlanID            int64   `json:"plan_id"`
+	// UpgradeFromSubscriptionID 非空时表示这是一笔升级订单：目标 plan_id 是新套餐，
+	// 后端会校验旧订阅合法性并按 proration 抵扣差价，履约时软删旧订阅+建新订阅。
+	UpgradeFromSubscriptionID *int64 `json:"upgrade_from_subscription_id,omitempty"`
 	// IsMobile lets the frontend declare its mobile status directly. When
 	// nil we fall back to User-Agent heuristics (which miss iPadOS / some
 	// embedded browsers that strip the "Mobile" keyword).
@@ -262,20 +265,21 @@ func (h *PaymentHandler) CreateOrder(c *gin.Context) {
 		mobile = *req.IsMobile
 	}
 	result, err := h.paymentService.CreateOrder(c.Request.Context(), service.CreateOrderRequest{
-		UserID:          subject.UserID,
-		Amount:          req.Amount,
-		PaymentType:     req.PaymentType,
-		OpenID:          req.OpenID,
-		ClientIP:        c.ClientIP(),
-		IsMobile:        mobile,
-		IsWeChatBrowser: isWeChatBrowser(c),
-		SrcHost:         c.Request.Host,
-		SrcURL:          c.Request.Referer(),
-		ReturnURL:       req.ReturnURL,
-		PaymentSource:   req.PaymentSource,
-		OrderType:       req.OrderType,
-		PlanID:          req.PlanID,
-		Locale:          c.GetHeader("Accept-Language"),
+		UserID:                     subject.UserID,
+		Amount:                     req.Amount,
+		PaymentType:                req.PaymentType,
+		OpenID:                     req.OpenID,
+		ClientIP:                   c.ClientIP(),
+		IsMobile:                   mobile,
+		IsWeChatBrowser:            isWeChatBrowser(c),
+		SrcHost:                    c.Request.Host,
+		SrcURL:                     c.Request.Referer(),
+		ReturnURL:                  req.ReturnURL,
+		PaymentSource:              req.PaymentSource,
+		OrderType:                  req.OrderType,
+		PlanID:                     req.PlanID,
+		UpgradeFromSubscriptionID:  req.UpgradeFromSubscriptionID,
+		Locale:                     c.GetHeader("Accept-Language"),
 	})
 	if err != nil {
 		response.ErrorFrom(c, err)

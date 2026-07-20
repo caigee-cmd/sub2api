@@ -53,11 +53,24 @@ func (s *PaymentService) CreateOrder(ctx context.Context, req CreateOrderRequest
 	if s.notificationEmailService != nil {
 		s.notificationEmailService.RememberRecipientLocale(ctx, req.UserID, user.Email, req.Locale)
 	}
+	// 升级订单：校验旧订阅 + 计算 proration，用 payable 覆盖订单金额
+	var upgradeProration *UpgradePreviewResult
+	if req.OrderType == payment.OrderTypeSubscription && req.UpgradeFromSubscriptionID != nil {
+		upgradeProration, err = s.validateUpgradeOrder(ctx, req)
+		if err != nil {
+			return nil, err
+		}
+	}
 	orderAmount := req.Amount
 	limitAmount := req.Amount
 	if plan != nil {
 		orderAmount = plan.Price
 		limitAmount = plan.Price
+		// 升级订单：用 proration 后的实付金额覆盖
+		if upgradeProration != nil {
+			orderAmount = upgradeProration.Payable
+			limitAmount = upgradeProration.Payable
+		}
 	} else if req.OrderType == payment.OrderTypeBalance {
 		orderAmount = calculateCreditedBalance(req.Amount, cfg.BalanceRechargeMultiplier)
 	}
@@ -100,7 +113,7 @@ func (s *PaymentService) CreateOrder(ctx context.Context, req CreateOrderRequest
 	if oauthResp != nil {
 		return oauthResp, nil
 	}
-	order, err := s.createOrderInTx(ctx, req, user, plan, cfg, orderAmount, limitAmount, feeRate, payAmount, sel)
+	order, err := s.createOrderInTx(ctx, req, user, plan, cfg, orderAmount, limitAmount, feeRate, payAmount, sel, upgradeProration)
 	if err != nil {
 		return nil, err
 	}
@@ -149,7 +162,17 @@ func (s *PaymentService) validateSubOrder(ctx context.Context, req CreateOrderRe
 	return plan, nil
 }
 
-func (s *PaymentService) createOrderInTx(ctx context.Context, req CreateOrderRequest, user *User, plan *dbent.SubscriptionPlan, cfg *PaymentConfig, orderAmount, limitAmount, feeRate, payAmount float64, sel *payment.InstanceSelection) (*dbent.PaymentOrder, error) {
+// validateUpgradeOrder 校验升级订单合法性并返回 proration 结果。
+// 仅当 req.UpgradeFromSubscriptionID 非空时调用。
+// 返回的 ProrationResult.Payable 用作订单 orderAmount（覆盖 plan.Price）。
+func (s *PaymentService) validateUpgradeOrder(ctx context.Context, req CreateOrderRequest) (*UpgradePreviewResult, error) {
+	if s.subscriptionSvc == nil {
+		return nil, infraerrors.ServiceUnavailable("SUBSCRIPTION_UPGRADE_UNAVAILABLE", "upgrade feature is not configured")
+	}
+	return s.subscriptionSvc.ResolveUpgradeFromSubscription(ctx, req.UserID, *req.UpgradeFromSubscriptionID, req.PlanID)
+}
+
+func (s *PaymentService) createOrderInTx(ctx context.Context, req CreateOrderRequest, user *User, plan *dbent.SubscriptionPlan, cfg *PaymentConfig, orderAmount, limitAmount, feeRate, payAmount float64, sel *payment.InstanceSelection, upgradeProration *UpgradePreviewResult) (*dbent.PaymentOrder, error) {
 	tx, err := s.entClient.Tx(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("begin transaction: %w", err)
@@ -208,6 +231,13 @@ func (s *PaymentService) createOrderInTx(ctx context.Context, req CreateOrderReq
 	}
 	if plan != nil {
 		b.SetPlanID(plan.ID).SetSubscriptionGroupID(plan.GroupID).SetSubscriptionDays(psComputeValidityDays(plan.ValidityDays, plan.ValidityUnit))
+	}
+	// 升级订单：记录源订阅 ID + proration 抵扣额，履约时据此软删旧订阅+建新订阅
+	if req.UpgradeFromSubscriptionID != nil {
+		b.SetUpgradeFromSubscriptionID(*req.UpgradeFromSubscriptionID)
+	}
+	if upgradeProration != nil {
+		b.SetProrationCredit(upgradeProration.Credit)
 	}
 	order, err := b.Save(ctx)
 	if err != nil {

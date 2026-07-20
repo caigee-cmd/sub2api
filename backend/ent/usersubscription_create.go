@@ -79,6 +79,20 @@ func (_c *UserSubscriptionCreate) SetGroupID(v int64) *UserSubscriptionCreate {
 	return _c
 }
 
+// SetPlanID sets the "plan_id" field.
+func (_c *UserSubscriptionCreate) SetPlanID(v int64) *UserSubscriptionCreate {
+	_c.mutation.SetPlanID(v)
+	return _c
+}
+
+// SetNillablePlanID sets the "plan_id" field if the given value is not nil.
+func (_c *UserSubscriptionCreate) SetNillablePlanID(v *int64) *UserSubscriptionCreate {
+	if v != nil {
+		_c.SetPlanID(*v)
+	}
+	return _c
+}
+
 // SetStartsAt sets the "starts_at" field.
 func (_c *UserSubscriptionCreate) SetStartsAt(v time.Time) *UserSubscriptionCreate {
 	_c.mutation.SetStartsAt(v)
@@ -437,6 +451,10 @@ func (_c *UserSubscriptionCreate) createSpec() (*UserSubscription, *sqlgraph.Cre
 		_spec.SetField(usersubscription.FieldDeletedAt, field.TypeTime, value)
 		_node.DeletedAt = &value
 	}
+	if value, ok := _c.mutation.PlanID(); ok {
+		_spec.SetField(usersubscription.FieldPlanID, field.TypeInt64, value)
+		_node.PlanID = &value
+	}
 	if value, ok := _c.mutation.StartsAt(); ok {
 		_spec.SetField(usersubscription.FieldStartsAt, field.TypeTime, value)
 		_node.StartsAt = value
@@ -651,6 +669,30 @@ func (u *UserSubscriptionUpsert) SetGroupID(v int64) *UserSubscriptionUpsert {
 // UpdateGroupID sets the "group_id" field to the value that was provided on create.
 func (u *UserSubscriptionUpsert) UpdateGroupID() *UserSubscriptionUpsert {
 	u.SetExcluded(usersubscription.FieldGroupID)
+	return u
+}
+
+// SetPlanID sets the "plan_id" field.
+func (u *UserSubscriptionUpsert) SetPlanID(v int64) *UserSubscriptionUpsert {
+	u.Set(usersubscription.FieldPlanID, v)
+	return u
+}
+
+// UpdatePlanID sets the "plan_id" field to the value that was provided on create.
+func (u *UserSubscriptionUpsert) UpdatePlanID() *UserSubscriptionUpsert {
+	u.SetExcluded(usersubscription.FieldPlanID)
+	return u
+}
+
+// AddPlanID adds v to the "plan_id" field.
+func (u *UserSubscriptionUpsert) AddPlanID(v int64) *UserSubscriptionUpsert {
+	u.Add(usersubscription.FieldPlanID, v)
+	return u
+}
+
+// ClearPlanID clears the value of the "plan_id" field.
+func (u *UserSubscriptionUpsert) ClearPlanID() *UserSubscriptionUpsert {
+	u.SetNull(usersubscription.FieldPlanID)
 	return u
 }
 
@@ -951,6 +993,34 @@ func (u *UserSubscriptionUpsertOne) SetGroupID(v int64) *UserSubscriptionUpsertO
 func (u *UserSubscriptionUpsertOne) UpdateGroupID() *UserSubscriptionUpsertOne {
 	return u.Update(func(s *UserSubscriptionUpsert) {
 		s.UpdateGroupID()
+	})
+}
+
+// SetPlanID sets the "plan_id" field.
+func (u *UserSubscriptionUpsertOne) SetPlanID(v int64) *UserSubscriptionUpsertOne {
+	return u.Update(func(s *UserSubscriptionUpsert) {
+		s.SetPlanID(v)
+	})
+}
+
+// AddPlanID adds v to the "plan_id" field.
+func (u *UserSubscriptionUpsertOne) AddPlanID(v int64) *UserSubscriptionUpsertOne {
+	return u.Update(func(s *UserSubscriptionUpsert) {
+		s.AddPlanID(v)
+	})
+}
+
+// UpdatePlanID sets the "plan_id" field to the value that was provided on create.
+func (u *UserSubscriptionUpsertOne) UpdatePlanID() *UserSubscriptionUpsertOne {
+	return u.Update(func(s *UserSubscriptionUpsert) {
+		s.UpdatePlanID()
+	})
+}
+
+// ClearPlanID clears the value of the "plan_id" field.
+func (u *UserSubscriptionUpsertOne) ClearPlanID() *UserSubscriptionUpsertOne {
+	return u.Update(func(s *UserSubscriptionUpsert) {
+		s.ClearPlanID()
 	})
 }
 
@@ -1449,6 +1519,34 @@ func (u *UserSubscriptionUpsertBulk) SetGroupID(v int64) *UserSubscriptionUpsert
 func (u *UserSubscriptionUpsertBulk) UpdateGroupID() *UserSubscriptionUpsertBulk {
 	return u.Update(func(s *UserSubscriptionUpsert) {
 		s.UpdateGroupID()
+	})
+}
+
+// SetPlanID sets the "plan_id" field.
+func (u *UserSubscriptionUpsertBulk) SetPlanID(v int64) *UserSubscriptionUpsertBulk {
+	return u.Update(func(s *UserSubscriptionUpsert) {
+		s.SetPlanID(v)
+	})
+}
+
+// AddPlanID adds v to the "plan_id" field.
+func (u *UserSubscriptionUpsertBulk) AddPlanID(v int64) *UserSubscriptionUpsertBulk {
+	return u.Update(func(s *UserSubscriptionUpsert) {
+		s.AddPlanID(v)
+	})
+}
+
+// UpdatePlanID sets the "plan_id" field to the value that was provided on create.
+func (u *UserSubscriptionUpsertBulk) UpdatePlanID() *UserSubscriptionUpsertBulk {
+	return u.Update(func(s *UserSubscriptionUpsert) {
+		s.UpdatePlanID()
+	})
+}
+
+// ClearPlanID clears the value of the "plan_id" field.
+func (u *UserSubscriptionUpsertBulk) ClearPlanID() *UserSubscriptionUpsertBulk {
+	return u.Update(func(s *UserSubscriptionUpsert) {
+		s.ClearPlanID()
 	})
 }
 

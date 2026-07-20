@@ -87,6 +87,14 @@ func (PaymentOrder) Fields() []ent.Field {
 		field.Int("subscription_days").
 			Optional().
 			Nillable(),
+		// 升级订单：源订阅 ID（非空表示这是一笔升级订单，履约时软删源订阅+建新订阅）
+		field.Int64("upgrade_from_subscription_id").
+			Optional().
+			Nillable(),
+		// 升级订单：proration 抵扣额（源订阅剩余价值按天折算）
+		field.Float("proration_credit").
+			SchemaType(map[string]string{dialect.Postgres: "decimal(20,2)"}).
+			Default(0),
 		field.String("provider_instance_id").
 			Optional().
 			Nillable().

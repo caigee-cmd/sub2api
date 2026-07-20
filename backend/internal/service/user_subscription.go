@@ -9,6 +9,10 @@ type UserSubscription struct {
 	UserID  int64
 	GroupID int64
 
+	// PlanID 记录订阅由哪个套餐产生（升级 proration 计算需要回溯原套餐）。
+	// 历史订阅（admin 分配 / 兑换码）可能为 nil，此时无法升级。
+	PlanID *int64
+
 	StartsAt  time.Time
 	ExpiresAt time.Time
 	Status    string

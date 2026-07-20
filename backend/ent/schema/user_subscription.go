@@ -38,6 +38,11 @@ func (UserSubscription) Fields() []ent.Field {
 		field.Int64("user_id"),
 		field.Int64("group_id"),
 
+		// plan_id 记录订阅由哪个 subscription_plan 产生（升级 proration 计算需要回溯原套餐）
+		field.Int64("plan_id").
+			Optional().
+			Nillable(),
+
 		field.Time("starts_at").
 			SchemaType(map[string]string{dialect.Postgres: "timestamptz"}),
 		field.Time("expires_at").

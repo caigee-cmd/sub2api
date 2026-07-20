@@ -31,6 +31,7 @@ func (r *userSubscriptionRepository) Create(ctx context.Context, sub *service.Us
 	builder := client.UserSubscription.Create().
 		SetUserID(sub.UserID).
 		SetGroupID(sub.GroupID).
+		SetNillablePlanID(sub.PlanID).
 		SetExpiresAt(sub.ExpiresAt).
 		SetNillableDailyWindowStart(sub.DailyWindowStart).
 		SetNillableWeeklyWindowStart(sub.WeeklyWindowStart).
@@ -128,6 +129,7 @@ func (r *userSubscriptionRepository) Update(ctx context.Context, sub *service.Us
 	builder := client.UserSubscription.UpdateOneID(sub.ID).
 		SetUserID(sub.UserID).
 		SetGroupID(sub.GroupID).
+		SetNillablePlanID(sub.PlanID).
 		SetStartsAt(sub.StartsAt).
 		SetExpiresAt(sub.ExpiresAt).
 		SetStatus(sub.Status).
@@ -626,6 +628,7 @@ func userSubscriptionEntityToServiceWithStatusMapping(m *dbent.UserSubscription,
 		ID:                 m.ID,
 		UserID:             m.UserID,
 		GroupID:            m.GroupID,
+		PlanID:             m.PlanID,
 		StartsAt:           m.StartsAt,
 		ExpiresAt:          m.ExpiresAt,
 		Status:             status,

@@ -39,6 +39,14 @@ var (
 	ErrMonthlyLimitExceeded        = infraerrors.TooManyRequests("MONTHLY_LIMIT_EXCEEDED", "monthly usage limit exceeded")
 	ErrSubscriptionNilInput        = infraerrors.BadRequest("SUBSCRIPTION_NIL_INPUT", "subscription input cannot be nil")
 	ErrAdjustWouldExpire           = infraerrors.BadRequest("ADJUST_WOULD_EXPIRE", "adjustment would result in expired subscription (remaining days must be > 0)")
+
+	// 升级相关错误码
+	ErrSubscriptionUpgradeNotHigher     = infraerrors.BadRequest("SUBSCRIPTION_UPGRADE_NOT_HIGHER", "target plan must be higher tier than current")
+	ErrSubscriptionUpgradeNotActive    = infraerrors.BadRequest("SUBSCRIPTION_UPGRADE_NOT_ACTIVE", "only active subscriptions can be upgraded")
+	ErrSubscriptionUpgradeSameGroup    = infraerrors.BadRequest("SUBSCRIPTION_UPGRADE_SAME_GROUP", "upgrade must target a different group (use renew for same group)")
+	ErrSubscriptionUpgradePlanNotFound = infraerrors.NotFound("SUBSCRIPTION_UPGRADE_PLAN_NOT_FOUND", "target plan not found or not for sale")
+	ErrSubscriptionUpgradeNoOldPlan    = infraerrors.BadRequest("SUBSCRIPTION_UPGRADE_NO_OLD_PLAN", "current subscription has no plan_id, cannot compute proration")
+	ErrSubscriptionUpgradeInvalidPlan  = infraerrors.BadRequest("SUBSCRIPTION_UPGRADE_INVALID_PLAN", "subscription plan has invalid validity period")
 )
 
 // SubscriptionService 订阅服务
@@ -47,6 +55,8 @@ type SubscriptionService struct {
 	userSubRepo         UserSubscriptionRepository
 	billingCacheService *BillingCacheService
 	entClient           *dbent.Client
+	// configService 用于升级 proration 计算时查询套餐信息
+	configService *PaymentConfigService
 
 	// L1 缓存：加速中间件热路径的订阅查询
 	subCacheL1     *ristretto.Cache
@@ -58,12 +68,13 @@ type SubscriptionService struct {
 }
 
 // NewSubscriptionService 创建订阅服务
-func NewSubscriptionService(groupRepo GroupRepository, userSubRepo UserSubscriptionRepository, billingCacheService *BillingCacheService, entClient *dbent.Client, cfg *config.Config) *SubscriptionService {
+func NewSubscriptionService(groupRepo GroupRepository, userSubRepo UserSubscriptionRepository, billingCacheService *BillingCacheService, entClient *dbent.Client, cfg *config.Config, configService *PaymentConfigService) *SubscriptionService {
 	svc := &SubscriptionService{
 		groupRepo:           groupRepo,
 		userSubRepo:         userSubRepo,
 		billingCacheService: billingCacheService,
 		entClient:           entClient,
+		configService:       configService,
 	}
 	svc.initSubCache(cfg)
 	svc.initMaintenanceQueue(cfg)
@@ -194,6 +205,8 @@ type AssignSubscriptionInput struct {
 	ValidityDays int
 	AssignedBy   int64
 	Notes        string
+	// PlanID 记录订阅由哪个套餐产生（购买/升级时透传，admin 分配/兑换码可留空）
+	PlanID *int64
 }
 
 // AssignSubscription 分配订阅给用户（不允许重复分配）
@@ -411,6 +424,7 @@ func (s *SubscriptionService) createSubscription(ctx context.Context, input *Ass
 	sub := &UserSubscription{
 		UserID:     input.UserID,
 		GroupID:    input.GroupID,
+		PlanID:     input.PlanID,
 		StartsAt:   now,
 		ExpiresAt:  expiresAt,
 		Status:     SubscriptionStatusActive,
@@ -1223,4 +1237,152 @@ func (s *SubscriptionService) ValidateSubscription(ctx context.Context, sub *Use
 		return ErrSubscriptionExpired
 	}
 	return nil
+}
+
+// UpgradePreviewResult 升级预览结果（给 handler 直接序列化）
+type UpgradePreviewResult struct {
+	OldPlan        *dbent.SubscriptionPlan `json:"old_plan"`
+	NewPlan        *dbent.SubscriptionPlan `json:"new_plan"`
+	RemainingDays  int                     `json:"remaining_days"`
+	TotalDays      int                     `json:"total_days"`
+	Credit         float64                 `json:"credit"`
+	Payable        float64                 `json:"payable"`
+	NewExpiresAt   time.Time               `json:"new_expires_at"`
+}
+
+// PreviewUpgrade 预览升级：计算从当前订阅升级到 newPlanID 的 proration 抵扣与实付金额。
+// 只做只读计算，不修改任何数据。POST /api/v1/subscriptions/:id/upgrade-preview
+// userID 用于归属校验（订阅必须属于当前用户）。
+func (s *SubscriptionService) PreviewUpgrade(ctx context.Context, userID, subscriptionID, newPlanID int64) (*UpgradePreviewResult, error) {
+	if s.configService == nil {
+		return nil, infraerrors.ServiceUnavailable("SUBSCRIPTION_UPGRADE_UNAVAILABLE", "upgrade feature is not configured")
+	}
+
+	// 1. 取当前订阅
+	sub, err := s.userSubRepo.GetByID(ctx, subscriptionID)
+	if err != nil {
+		return nil, ErrSubscriptionNotFound
+	}
+	// 归属校验：订阅必须属于当前用户
+	if sub.UserID != userID {
+		return nil, infraerrors.Forbidden("FORBIDDEN", "cannot upgrade another user's subscription")
+	}
+	if sub.Status != SubscriptionStatusActive || sub.IsExpired() {
+		return nil, ErrSubscriptionUpgradeNotActive
+	}
+	if sub.PlanID == nil {
+		// 历史订阅（admin 分配 / 兑换码）没有 plan_id，无法算 proration
+		return nil, ErrSubscriptionUpgradeNoOldPlan
+	}
+
+	// 2. 取 oldPlan / newPlan
+	oldPlan, err := s.configService.GetPlan(ctx, *sub.PlanID)
+	if err != nil {
+		return nil, ErrSubscriptionUpgradeNoOldPlan
+	}
+	newPlan, err := s.configService.GetPlan(ctx, newPlanID)
+	if err != nil || !newPlan.ForSale {
+		return nil, ErrSubscriptionUpgradePlanNotFound
+	}
+
+	// 3. 校验目标 group 必须不同于当前 group（同 group 用续费，不用升级）
+	if newPlan.GroupID == sub.GroupID {
+		return nil, ErrSubscriptionUpgradeSameGroup
+	}
+
+	// 4. 校验目标 group 必须是 active 的订阅类型
+	newGroup, err := s.groupRepo.GetByID(ctx, newPlan.GroupID)
+	if err != nil || newGroup.Status != "active" {
+		return nil, ErrSubscriptionUpgradePlanNotFound
+	}
+	if !newGroup.IsSubscriptionType() {
+		return nil, ErrGroupNotSubscriptionType
+	}
+
+	// 5. 计算 proration
+	proration, err := ComputeUpgradeProration(oldPlan, newPlan, sub, time.Now())
+	if err != nil {
+		return nil, err
+	}
+
+	return &UpgradePreviewResult{
+		OldPlan:       oldPlan,
+		NewPlan:       newPlan,
+		RemainingDays: proration.RemainingDays,
+		TotalDays:     proration.TotalDays,
+		Credit:        proration.Credit,
+		Payable:       proration.Payable,
+		NewExpiresAt:  proration.NewExpiresAt,
+	}, nil
+}
+
+// ResolveUpgradeFromSubscription 在下单时校验升级订单的合法性并返回 proration 结果。
+// 由 PaymentService.validateSubOrder 调用，返回 oldPlan/newPlan/proration 供订单金额计算。
+func (s *SubscriptionService) ResolveUpgradeFromSubscription(ctx context.Context, userID, fromSubscriptionID, newPlanID int64) (*UpgradePreviewResult, error) {
+	// 复用 PreviewUpgrade 的全部校验逻辑（含归属校验）
+	return s.PreviewUpgrade(ctx, userID, fromSubscriptionID, newPlanID)
+}
+
+// FulfillUpgradeSubscription 在支付履约时执行升级：原子地软删旧订阅 + 创建新订阅。
+// 由 PaymentService.ensurePaymentSubscriptionAssigned 在事务内调用。
+// 调用方必须已经持有 dbent.TxContext（withSubscriptionUpdateTx 会复用该事务）。
+// 返回新建的订阅（含 ID）和旧订阅的 groupID（供调用方失效缓存）。
+func (s *SubscriptionService) FulfillUpgradeSubscription(ctx context.Context, userID, fromSubscriptionID int64, newPlan *dbent.SubscriptionPlan, notes string) (*UserSubscription, int64, error) {
+	if newPlan == nil {
+		return nil, 0, ErrSubscriptionNilInput
+	}
+
+	// 1. 取旧订阅并校验
+	oldSub, err := s.userSubRepo.GetByID(ctx, fromSubscriptionID)
+	if err != nil {
+		return nil, 0, ErrSubscriptionNotFound
+	}
+	if oldSub.UserID != userID {
+		return nil, 0, infraerrors.Forbidden("FORBIDDEN", "cannot upgrade another user's subscription")
+	}
+	if oldSub.Status != SubscriptionStatusActive || oldSub.IsExpired() {
+		return nil, 0, ErrSubscriptionUpgradeNotActive
+	}
+	// 目标 group 必须不同于当前 group
+	if newPlan.GroupID == oldSub.GroupID {
+		return nil, 0, ErrSubscriptionUpgradeSameGroup
+	}
+	oldGroupID := oldSub.GroupID
+
+	// 2. 计算新订阅有效期（从今天重算，剩余价值只用于抵扣差价）
+	validityDays := psComputeValidityDays(newPlan.ValidityDays, newPlan.ValidityUnit)
+	if validityDays <= 0 {
+		validityDays = 30
+	}
+	if validityDays > MaxValidityDays {
+		validityDays = MaxValidityDays
+	}
+
+	// 3. 在事务内：软删旧订阅 + 创建新订阅（带 plan_id）
+	newPlanID := int64(newPlan.ID)
+	var newSub *UserSubscription
+	err = s.withSubscriptionUpdateTx(ctx, func(txCtx context.Context) error {
+		// 软删旧订阅（Delete 是软删除，配合 016 部分唯一索引允许同 group 重建）
+		if err := s.userSubRepo.Delete(txCtx, oldSub.ID); err != nil {
+			return fmt.Errorf("soft-delete old subscription: %w", err)
+		}
+		// 创建新订阅（新 group，带 plan_id 透传）
+		created, createErr := s.createSubscription(txCtx, &AssignSubscriptionInput{
+			UserID:       userID,
+			GroupID:      newPlan.GroupID,
+			ValidityDays: validityDays,
+			AssignedBy:   0,
+			Notes:        notes,
+			PlanID:       &newPlanID,
+		})
+		if createErr != nil {
+			return fmt.Errorf("create upgraded subscription: %w", createErr)
+		}
+		newSub = created
+		return nil
+	})
+	if err != nil {
+		return nil, 0, err
+	}
+	return newSub, oldGroupID, nil
 }

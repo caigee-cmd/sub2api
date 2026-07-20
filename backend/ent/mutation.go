@@ -27671,60 +27671,64 @@ func (m *PaymentAuditLogMutation) ResetEdge(name string) error {
 // PaymentOrderMutation represents an operation that mutates the PaymentOrder nodes in the graph.
 type PaymentOrderMutation struct {
 	config
-	op                       Op
-	typ                      string
-	id                       *int64
-	user_email               *string
-	user_name                *string
-	user_notes               *string
-	amount                   *float64
-	addamount                *float64
-	pay_amount               *float64
-	addpay_amount            *float64
-	fee_rate                 *float64
-	addfee_rate              *float64
-	recharge_code            *string
-	out_trade_no             *string
-	payment_type             *string
-	payment_trade_no         *string
-	pay_url                  *string
-	qr_code                  *string
-	qr_code_img              *string
-	order_type               *string
-	plan_id                  *int64
-	addplan_id               *int64
-	subscription_group_id    *int64
-	addsubscription_group_id *int64
-	subscription_days        *int
-	addsubscription_days     *int
-	provider_instance_id     *string
-	provider_key             *string
-	provider_snapshot        *map[string]interface{}
-	status                   *string
-	refund_amount            *float64
-	addrefund_amount         *float64
-	refund_reason            *string
-	refund_at                *time.Time
-	force_refund             *bool
-	refund_requested_at      *time.Time
-	refund_request_reason    *string
-	refund_requested_by      *string
-	expires_at               *time.Time
-	paid_at                  *time.Time
-	completed_at             *time.Time
-	failed_at                *time.Time
-	failed_reason            *string
-	client_ip                *string
-	src_host                 *string
-	src_url                  *string
-	created_at               *time.Time
-	updated_at               *time.Time
-	clearedFields            map[string]struct{}
-	user                     *int64
-	cleareduser              bool
-	done                     bool
-	oldValue                 func(context.Context) (*PaymentOrder, error)
-	predicates               []predicate.PaymentOrder
+	op                              Op
+	typ                             string
+	id                              *int64
+	user_email                      *string
+	user_name                       *string
+	user_notes                      *string
+	amount                          *float64
+	addamount                       *float64
+	pay_amount                      *float64
+	addpay_amount                   *float64
+	fee_rate                        *float64
+	addfee_rate                     *float64
+	recharge_code                   *string
+	out_trade_no                    *string
+	payment_type                    *string
+	payment_trade_no                *string
+	pay_url                         *string
+	qr_code                         *string
+	qr_code_img                     *string
+	order_type                      *string
+	plan_id                         *int64
+	addplan_id                      *int64
+	subscription_group_id           *int64
+	addsubscription_group_id        *int64
+	subscription_days               *int
+	addsubscription_days            *int
+	upgrade_from_subscription_id    *int64
+	addupgrade_from_subscription_id *int64
+	proration_credit                *float64
+	addproration_credit             *float64
+	provider_instance_id            *string
+	provider_key                    *string
+	provider_snapshot               *map[string]interface{}
+	status                          *string
+	refund_amount                   *float64
+	addrefund_amount                *float64
+	refund_reason                   *string
+	refund_at                       *time.Time
+	force_refund                    *bool
+	refund_requested_at             *time.Time
+	refund_request_reason           *string
+	refund_requested_by             *string
+	expires_at                      *time.Time
+	paid_at                         *time.Time
+	completed_at                    *time.Time
+	failed_at                       *time.Time
+	failed_reason                   *string
+	client_ip                       *string
+	src_host                        *string
+	src_url                         *string
+	created_at                      *time.Time
+	updated_at                      *time.Time
+	clearedFields                   map[string]struct{}
+	user                            *int64
+	cleareduser                     bool
+	done                            bool
+	oldValue                        func(context.Context) (*PaymentOrder, error)
+	predicates                      []predicate.PaymentOrder
 }
 
 var _ ent.Mutation = (*PaymentOrderMutation)(nil)
@@ -28685,6 +28689,132 @@ func (m *PaymentOrderMutation) ResetSubscriptionDays() {
 	m.subscription_days = nil
 	m.addsubscription_days = nil
 	delete(m.clearedFields, paymentorder.FieldSubscriptionDays)
+}
+
+// SetUpgradeFromSubscriptionID sets the "upgrade_from_subscription_id" field.
+func (m *PaymentOrderMutation) SetUpgradeFromSubscriptionID(i int64) {
+	m.upgrade_from_subscription_id = &i
+	m.addupgrade_from_subscription_id = nil
+}
+
+// UpgradeFromSubscriptionID returns the value of the "upgrade_from_subscription_id" field in the mutation.
+func (m *PaymentOrderMutation) UpgradeFromSubscriptionID() (r int64, exists bool) {
+	v := m.upgrade_from_subscription_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldUpgradeFromSubscriptionID returns the old "upgrade_from_subscription_id" field's value of the PaymentOrder entity.
+// If the PaymentOrder object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *PaymentOrderMutation) OldUpgradeFromSubscriptionID(ctx context.Context) (v *int64, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldUpgradeFromSubscriptionID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldUpgradeFromSubscriptionID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldUpgradeFromSubscriptionID: %w", err)
+	}
+	return oldValue.UpgradeFromSubscriptionID, nil
+}
+
+// AddUpgradeFromSubscriptionID adds i to the "upgrade_from_subscription_id" field.
+func (m *PaymentOrderMutation) AddUpgradeFromSubscriptionID(i int64) {
+	if m.addupgrade_from_subscription_id != nil {
+		*m.addupgrade_from_subscription_id += i
+	} else {
+		m.addupgrade_from_subscription_id = &i
+	}
+}
+
+// AddedUpgradeFromSubscriptionID returns the value that was added to the "upgrade_from_subscription_id" field in this mutation.
+func (m *PaymentOrderMutation) AddedUpgradeFromSubscriptionID() (r int64, exists bool) {
+	v := m.addupgrade_from_subscription_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ClearUpgradeFromSubscriptionID clears the value of the "upgrade_from_subscription_id" field.
+func (m *PaymentOrderMutation) ClearUpgradeFromSubscriptionID() {
+	m.upgrade_from_subscription_id = nil
+	m.addupgrade_from_subscription_id = nil
+	m.clearedFields[paymentorder.FieldUpgradeFromSubscriptionID] = struct{}{}
+}
+
+// UpgradeFromSubscriptionIDCleared returns if the "upgrade_from_subscription_id" field was cleared in this mutation.
+func (m *PaymentOrderMutation) UpgradeFromSubscriptionIDCleared() bool {
+	_, ok := m.clearedFields[paymentorder.FieldUpgradeFromSubscriptionID]
+	return ok
+}
+
+// ResetUpgradeFromSubscriptionID resets all changes to the "upgrade_from_subscription_id" field.
+func (m *PaymentOrderMutation) ResetUpgradeFromSubscriptionID() {
+	m.upgrade_from_subscription_id = nil
+	m.addupgrade_from_subscription_id = nil
+	delete(m.clearedFields, paymentorder.FieldUpgradeFromSubscriptionID)
+}
+
+// SetProrationCredit sets the "proration_credit" field.
+func (m *PaymentOrderMutation) SetProrationCredit(f float64) {
+	m.proration_credit = &f
+	m.addproration_credit = nil
+}
+
+// ProrationCredit returns the value of the "proration_credit" field in the mutation.
+func (m *PaymentOrderMutation) ProrationCredit() (r float64, exists bool) {
+	v := m.proration_credit
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldProrationCredit returns the old "proration_credit" field's value of the PaymentOrder entity.
+// If the PaymentOrder object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *PaymentOrderMutation) OldProrationCredit(ctx context.Context) (v float64, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldProrationCredit is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldProrationCredit requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldProrationCredit: %w", err)
+	}
+	return oldValue.ProrationCredit, nil
+}
+
+// AddProrationCredit adds f to the "proration_credit" field.
+func (m *PaymentOrderMutation) AddProrationCredit(f float64) {
+	if m.addproration_credit != nil {
+		*m.addproration_credit += f
+	} else {
+		m.addproration_credit = &f
+	}
+}
+
+// AddedProrationCredit returns the value that was added to the "proration_credit" field in this mutation.
+func (m *PaymentOrderMutation) AddedProrationCredit() (r float64, exists bool) {
+	v := m.addproration_credit
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetProrationCredit resets all changes to the "proration_credit" field.
+func (m *PaymentOrderMutation) ResetProrationCredit() {
+	m.proration_credit = nil
+	m.addproration_credit = nil
 }
 
 // SetProviderInstanceID sets the "provider_instance_id" field.
@@ -29693,7 +29823,7 @@ func (m *PaymentOrderMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *PaymentOrderMutation) Fields() []string {
-	fields := make([]string, 0, 39)
+	fields := make([]string, 0, 41)
 	if m.user != nil {
 		fields = append(fields, paymentorder.FieldUserID)
 	}
@@ -29747,6 +29877,12 @@ func (m *PaymentOrderMutation) Fields() []string {
 	}
 	if m.subscription_days != nil {
 		fields = append(fields, paymentorder.FieldSubscriptionDays)
+	}
+	if m.upgrade_from_subscription_id != nil {
+		fields = append(fields, paymentorder.FieldUpgradeFromSubscriptionID)
+	}
+	if m.proration_credit != nil {
+		fields = append(fields, paymentorder.FieldProrationCredit)
 	}
 	if m.provider_instance_id != nil {
 		fields = append(fields, paymentorder.FieldProviderInstanceID)
@@ -29855,6 +29991,10 @@ func (m *PaymentOrderMutation) Field(name string) (ent.Value, bool) {
 		return m.SubscriptionGroupID()
 	case paymentorder.FieldSubscriptionDays:
 		return m.SubscriptionDays()
+	case paymentorder.FieldUpgradeFromSubscriptionID:
+		return m.UpgradeFromSubscriptionID()
+	case paymentorder.FieldProrationCredit:
+		return m.ProrationCredit()
 	case paymentorder.FieldProviderInstanceID:
 		return m.ProviderInstanceID()
 	case paymentorder.FieldProviderKey:
@@ -29942,6 +30082,10 @@ func (m *PaymentOrderMutation) OldField(ctx context.Context, name string) (ent.V
 		return m.OldSubscriptionGroupID(ctx)
 	case paymentorder.FieldSubscriptionDays:
 		return m.OldSubscriptionDays(ctx)
+	case paymentorder.FieldUpgradeFromSubscriptionID:
+		return m.OldUpgradeFromSubscriptionID(ctx)
+	case paymentorder.FieldProrationCredit:
+		return m.OldProrationCredit(ctx)
 	case paymentorder.FieldProviderInstanceID:
 		return m.OldProviderInstanceID(ctx)
 	case paymentorder.FieldProviderKey:
@@ -30119,6 +30263,20 @@ func (m *PaymentOrderMutation) SetField(name string, value ent.Value) error {
 		}
 		m.SetSubscriptionDays(v)
 		return nil
+	case paymentorder.FieldUpgradeFromSubscriptionID:
+		v, ok := value.(int64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetUpgradeFromSubscriptionID(v)
+		return nil
+	case paymentorder.FieldProrationCredit:
+		v, ok := value.(float64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetProrationCredit(v)
+		return nil
 	case paymentorder.FieldProviderInstanceID:
 		v, ok := value.(string)
 		if !ok {
@@ -30292,6 +30450,12 @@ func (m *PaymentOrderMutation) AddedFields() []string {
 	if m.addsubscription_days != nil {
 		fields = append(fields, paymentorder.FieldSubscriptionDays)
 	}
+	if m.addupgrade_from_subscription_id != nil {
+		fields = append(fields, paymentorder.FieldUpgradeFromSubscriptionID)
+	}
+	if m.addproration_credit != nil {
+		fields = append(fields, paymentorder.FieldProrationCredit)
+	}
 	if m.addrefund_amount != nil {
 		fields = append(fields, paymentorder.FieldRefundAmount)
 	}
@@ -30315,6 +30479,10 @@ func (m *PaymentOrderMutation) AddedField(name string) (ent.Value, bool) {
 		return m.AddedSubscriptionGroupID()
 	case paymentorder.FieldSubscriptionDays:
 		return m.AddedSubscriptionDays()
+	case paymentorder.FieldUpgradeFromSubscriptionID:
+		return m.AddedUpgradeFromSubscriptionID()
+	case paymentorder.FieldProrationCredit:
+		return m.AddedProrationCredit()
 	case paymentorder.FieldRefundAmount:
 		return m.AddedRefundAmount()
 	}
@@ -30368,6 +30536,20 @@ func (m *PaymentOrderMutation) AddField(name string, value ent.Value) error {
 		}
 		m.AddSubscriptionDays(v)
 		return nil
+	case paymentorder.FieldUpgradeFromSubscriptionID:
+		v, ok := value.(int64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddUpgradeFromSubscriptionID(v)
+		return nil
+	case paymentorder.FieldProrationCredit:
+		v, ok := value.(float64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddProrationCredit(v)
+		return nil
 	case paymentorder.FieldRefundAmount:
 		v, ok := value.(float64)
 		if !ok {
@@ -30403,6 +30585,9 @@ func (m *PaymentOrderMutation) ClearedFields() []string {
 	}
 	if m.FieldCleared(paymentorder.FieldSubscriptionDays) {
 		fields = append(fields, paymentorder.FieldSubscriptionDays)
+	}
+	if m.FieldCleared(paymentorder.FieldUpgradeFromSubscriptionID) {
+		fields = append(fields, paymentorder.FieldUpgradeFromSubscriptionID)
 	}
 	if m.FieldCleared(paymentorder.FieldProviderInstanceID) {
 		fields = append(fields, paymentorder.FieldProviderInstanceID)
@@ -30477,6 +30662,9 @@ func (m *PaymentOrderMutation) ClearField(name string) error {
 		return nil
 	case paymentorder.FieldSubscriptionDays:
 		m.ClearSubscriptionDays()
+		return nil
+	case paymentorder.FieldUpgradeFromSubscriptionID:
+		m.ClearUpgradeFromSubscriptionID()
 		return nil
 	case paymentorder.FieldProviderInstanceID:
 		m.ClearProviderInstanceID()
@@ -30578,6 +30766,12 @@ func (m *PaymentOrderMutation) ResetField(name string) error {
 		return nil
 	case paymentorder.FieldSubscriptionDays:
 		m.ResetSubscriptionDays()
+		return nil
+	case paymentorder.FieldUpgradeFromSubscriptionID:
+		m.ResetUpgradeFromSubscriptionID()
+		return nil
+	case paymentorder.FieldProrationCredit:
+		m.ResetProrationCredit()
 		return nil
 	case paymentorder.FieldProviderInstanceID:
 		m.ResetProviderInstanceID()
@@ -52658,6 +52852,8 @@ type UserSubscriptionMutation struct {
 	created_at              *time.Time
 	updated_at              *time.Time
 	deleted_at              *time.Time
+	plan_id                 *int64
+	addplan_id              *int64
 	starts_at               *time.Time
 	expires_at              *time.Time
 	status                  *string
@@ -52976,6 +53172,76 @@ func (m *UserSubscriptionMutation) OldGroupID(ctx context.Context) (v int64, err
 // ResetGroupID resets all changes to the "group_id" field.
 func (m *UserSubscriptionMutation) ResetGroupID() {
 	m.group = nil
+}
+
+// SetPlanID sets the "plan_id" field.
+func (m *UserSubscriptionMutation) SetPlanID(i int64) {
+	m.plan_id = &i
+	m.addplan_id = nil
+}
+
+// PlanID returns the value of the "plan_id" field in the mutation.
+func (m *UserSubscriptionMutation) PlanID() (r int64, exists bool) {
+	v := m.plan_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldPlanID returns the old "plan_id" field's value of the UserSubscription entity.
+// If the UserSubscription object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *UserSubscriptionMutation) OldPlanID(ctx context.Context) (v *int64, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldPlanID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldPlanID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldPlanID: %w", err)
+	}
+	return oldValue.PlanID, nil
+}
+
+// AddPlanID adds i to the "plan_id" field.
+func (m *UserSubscriptionMutation) AddPlanID(i int64) {
+	if m.addplan_id != nil {
+		*m.addplan_id += i
+	} else {
+		m.addplan_id = &i
+	}
+}
+
+// AddedPlanID returns the value that was added to the "plan_id" field in this mutation.
+func (m *UserSubscriptionMutation) AddedPlanID() (r int64, exists bool) {
+	v := m.addplan_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ClearPlanID clears the value of the "plan_id" field.
+func (m *UserSubscriptionMutation) ClearPlanID() {
+	m.plan_id = nil
+	m.addplan_id = nil
+	m.clearedFields[usersubscription.FieldPlanID] = struct{}{}
+}
+
+// PlanIDCleared returns if the "plan_id" field was cleared in this mutation.
+func (m *UserSubscriptionMutation) PlanIDCleared() bool {
+	_, ok := m.clearedFields[usersubscription.FieldPlanID]
+	return ok
+}
+
+// ResetPlanID resets all changes to the "plan_id" field.
+func (m *UserSubscriptionMutation) ResetPlanID() {
+	m.plan_id = nil
+	m.addplan_id = nil
+	delete(m.clearedFields, usersubscription.FieldPlanID)
 }
 
 // SetStartsAt sets the "starts_at" field.
@@ -53717,7 +53983,7 @@ func (m *UserSubscriptionMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *UserSubscriptionMutation) Fields() []string {
-	fields := make([]string, 0, 17)
+	fields := make([]string, 0, 18)
 	if m.created_at != nil {
 		fields = append(fields, usersubscription.FieldCreatedAt)
 	}
@@ -53732,6 +53998,9 @@ func (m *UserSubscriptionMutation) Fields() []string {
 	}
 	if m.group != nil {
 		fields = append(fields, usersubscription.FieldGroupID)
+	}
+	if m.plan_id != nil {
+		fields = append(fields, usersubscription.FieldPlanID)
 	}
 	if m.starts_at != nil {
 		fields = append(fields, usersubscription.FieldStartsAt)
@@ -53787,6 +54056,8 @@ func (m *UserSubscriptionMutation) Field(name string) (ent.Value, bool) {
 		return m.UserID()
 	case usersubscription.FieldGroupID:
 		return m.GroupID()
+	case usersubscription.FieldPlanID:
+		return m.PlanID()
 	case usersubscription.FieldStartsAt:
 		return m.StartsAt()
 	case usersubscription.FieldExpiresAt:
@@ -53830,6 +54101,8 @@ func (m *UserSubscriptionMutation) OldField(ctx context.Context, name string) (e
 		return m.OldUserID(ctx)
 	case usersubscription.FieldGroupID:
 		return m.OldGroupID(ctx)
+	case usersubscription.FieldPlanID:
+		return m.OldPlanID(ctx)
 	case usersubscription.FieldStartsAt:
 		return m.OldStartsAt(ctx)
 	case usersubscription.FieldExpiresAt:
@@ -53897,6 +54170,13 @@ func (m *UserSubscriptionMutation) SetField(name string, value ent.Value) error 
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetGroupID(v)
+		return nil
+	case usersubscription.FieldPlanID:
+		v, ok := value.(int64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetPlanID(v)
 		return nil
 	case usersubscription.FieldStartsAt:
 		v, ok := value.(time.Time)
@@ -53990,6 +54270,9 @@ func (m *UserSubscriptionMutation) SetField(name string, value ent.Value) error 
 // this mutation.
 func (m *UserSubscriptionMutation) AddedFields() []string {
 	var fields []string
+	if m.addplan_id != nil {
+		fields = append(fields, usersubscription.FieldPlanID)
+	}
 	if m.adddaily_usage_usd != nil {
 		fields = append(fields, usersubscription.FieldDailyUsageUsd)
 	}
@@ -54007,6 +54290,8 @@ func (m *UserSubscriptionMutation) AddedFields() []string {
 // was not set, or was not defined in the schema.
 func (m *UserSubscriptionMutation) AddedField(name string) (ent.Value, bool) {
 	switch name {
+	case usersubscription.FieldPlanID:
+		return m.AddedPlanID()
 	case usersubscription.FieldDailyUsageUsd:
 		return m.AddedDailyUsageUsd()
 	case usersubscription.FieldWeeklyUsageUsd:
@@ -54022,6 +54307,13 @@ func (m *UserSubscriptionMutation) AddedField(name string) (ent.Value, bool) {
 // type.
 func (m *UserSubscriptionMutation) AddField(name string, value ent.Value) error {
 	switch name {
+	case usersubscription.FieldPlanID:
+		v, ok := value.(int64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddPlanID(v)
+		return nil
 	case usersubscription.FieldDailyUsageUsd:
 		v, ok := value.(float64)
 		if !ok {
@@ -54054,6 +54346,9 @@ func (m *UserSubscriptionMutation) ClearedFields() []string {
 	if m.FieldCleared(usersubscription.FieldDeletedAt) {
 		fields = append(fields, usersubscription.FieldDeletedAt)
 	}
+	if m.FieldCleared(usersubscription.FieldPlanID) {
+		fields = append(fields, usersubscription.FieldPlanID)
+	}
 	if m.FieldCleared(usersubscription.FieldDailyWindowStart) {
 		fields = append(fields, usersubscription.FieldDailyWindowStart)
 	}
@@ -54085,6 +54380,9 @@ func (m *UserSubscriptionMutation) ClearField(name string) error {
 	switch name {
 	case usersubscription.FieldDeletedAt:
 		m.ClearDeletedAt()
+		return nil
+	case usersubscription.FieldPlanID:
+		m.ClearPlanID()
 		return nil
 	case usersubscription.FieldDailyWindowStart:
 		m.ClearDailyWindowStart()
@@ -54123,6 +54421,9 @@ func (m *UserSubscriptionMutation) ResetField(name string) error {
 		return nil
 	case usersubscription.FieldGroupID:
 		m.ResetGroupID()
+		return nil
+	case usersubscription.FieldPlanID:
+		m.ResetPlanID()
 		return nil
 	case usersubscription.FieldStartsAt:
 		m.ResetStartsAt()

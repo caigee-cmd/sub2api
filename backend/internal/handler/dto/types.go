@@ -607,6 +607,8 @@ type UserSubscription struct {
 	ID      int64 `json:"id"`
 	UserID  int64 `json:"user_id"`
 	GroupID int64 `json:"group_id"`
+	// PlanID 记录订阅由哪个套餐产生（升级 proration 计算需要）。历史订阅可能为 null。
+	PlanID *int64 `json:"plan_id,omitempty"`
 
 	StartsAt  time.Time `json:"starts_at"`
 	ExpiresAt time.Time `json:"expires_at"`

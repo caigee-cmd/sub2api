@@ -120,6 +120,8 @@ func RegisterUserRoutes(
 			subscriptions.GET("/active", h.Subscription.GetActive)
 			subscriptions.GET("/progress", h.Subscription.GetProgress)
 			subscriptions.GET("/summary", h.Subscription.GetSummary)
+			// 升级预览（只读计算 proration 抵扣与实付金额）
+			subscriptions.POST("/:id/upgrade-preview", h.Subscription.UpgradePreview)
 		}
 
 		// 渠道监控（用户只读）

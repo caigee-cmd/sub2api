@@ -84,6 +84,8 @@ type CreateOrderRequest struct {
 	PaymentSource   string
 	OrderType       string
 	PlanID          int64
+	// UpgradeFromSubscriptionID 非空时表示这是一笔升级订单（详见 handler 层注释）
+	UpgradeFromSubscriptionID *int64
 	Locale          string
 }
 

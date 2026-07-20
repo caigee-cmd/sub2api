@@ -42,7 +42,7 @@ func TestAssignOrExtendSubscription_ExpiredDailyCardStartsNewOneTimeQuota(t *tes
 		MonthlyUsageUSD:    30,
 		Notes:              "old",
 	})
-	svc := NewSubscriptionService(groupRepo, subRepo, nil, nil, nil)
+	svc := NewSubscriptionService(groupRepo, subRepo, nil, nil, nil, nil)
 
 	renewed, reused, err := svc.AssignOrExtendSubscription(context.Background(), &AssignSubscriptionInput{
 		UserID:       200,
@@ -141,7 +141,7 @@ func TestCheckAndResetWindows_DailyCardDoesNotResetDailyUsage(t *testing.T) {
 	startsAt := now.Add(-23 * time.Hour)
 	dailyWindowStart := now.Add(-25 * time.Hour)
 	repo := &dailyResetTrackingUserSubRepo{}
-	svc := NewSubscriptionService(groupRepoNoop{}, repo, nil, nil, nil)
+	svc := NewSubscriptionService(groupRepoNoop{}, repo, nil, nil, nil, nil)
 	sub := &UserSubscription{
 		ID:               1,
 		UserID:           10,
@@ -164,7 +164,7 @@ func TestCheckAndResetWindows_MultiDaySubscriptionStillResetsDailyUsage(t *testi
 	startsAt := now.Add(-48 * time.Hour)
 	dailyWindowStart := now.Add(-25 * time.Hour)
 	repo := &dailyResetTrackingUserSubRepo{}
-	svc := NewSubscriptionService(groupRepoNoop{}, repo, nil, nil, nil)
+	svc := NewSubscriptionService(groupRepoNoop{}, repo, nil, nil, nil, nil)
 	sub := &UserSubscription{
 		ID:               1,
 		UserID:           10,
@@ -197,7 +197,7 @@ func TestValidateAndCheckLimits_DailyCardDoesNotAllowSecondQuotaAfterMidnight(t 
 		SubscriptionType: SubscriptionTypeSubscription,
 		DailyLimitUSD:    &dailyLimit,
 	}
-	svc := NewSubscriptionService(groupRepoNoop{}, userSubRepoNoop{}, nil, nil, nil)
+	svc := NewSubscriptionService(groupRepoNoop{}, userSubRepoNoop{}, nil, nil, nil, nil)
 
 	needsMaintenance, err := svc.ValidateAndCheckLimits(sub, group)
 

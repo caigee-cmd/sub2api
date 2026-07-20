@@ -135,7 +135,7 @@ func TestSimpleModeBypassesQuotaCheck(t *testing.T) {
 				return nil
 			},
 		}
-		subscriptionService := service.NewSubscriptionService(nil, subscriptionRepo, nil, nil, cfg)
+		subscriptionService := service.NewSubscriptionService(nil, subscriptionRepo, nil, nil, cfg, nil)
 		t.Cleanup(subscriptionService.Stop)
 
 		router := newAuthTestRouter(apiKeyService, subscriptionService, cfg)
@@ -190,7 +190,7 @@ func TestSimpleModeBypassesQuotaCheck(t *testing.T) {
 			resetWeekly:  func(context.Context, int64, time.Time) error { return nil },
 			resetMonthly: func(context.Context, int64, time.Time) error { return nil },
 		}
-		subscriptionService := service.NewSubscriptionService(nil, subscriptionRepo, nil, nil, cfg)
+		subscriptionService := service.NewSubscriptionService(nil, subscriptionRepo, nil, nil, cfg, nil)
 		router := newAuthTestRouter(apiKeyService, subscriptionService, cfg)
 
 		w := httptest.NewRecorder()
@@ -204,7 +204,7 @@ func TestSimpleModeBypassesQuotaCheck(t *testing.T) {
 	t.Run("simple_mode_bypasses_quota_check", func(t *testing.T) {
 		cfg := &config.Config{RunMode: config.RunModeSimple}
 		apiKeyService := service.NewAPIKeyService(apiKeyRepo, nil, nil, nil, nil, nil, cfg)
-		subscriptionService := service.NewSubscriptionService(nil, &stubUserSubscriptionRepo{}, nil, nil, cfg)
+		subscriptionService := service.NewSubscriptionService(nil, &stubUserSubscriptionRepo{}, nil, nil, cfg, nil)
 		router := newAuthTestRouter(apiKeyService, subscriptionService, cfg)
 
 		w := httptest.NewRecorder()
@@ -218,7 +218,7 @@ func TestSimpleModeBypassesQuotaCheck(t *testing.T) {
 	t.Run("simple_mode_accepts_lowercase_bearer", func(t *testing.T) {
 		cfg := &config.Config{RunMode: config.RunModeSimple}
 		apiKeyService := service.NewAPIKeyService(apiKeyRepo, nil, nil, nil, nil, nil, cfg)
-		subscriptionService := service.NewSubscriptionService(nil, &stubUserSubscriptionRepo{}, nil, nil, cfg)
+		subscriptionService := service.NewSubscriptionService(nil, &stubUserSubscriptionRepo{}, nil, nil, cfg, nil)
 		router := newAuthTestRouter(apiKeyService, subscriptionService, cfg)
 
 		w := httptest.NewRecorder()
@@ -257,7 +257,7 @@ func TestSimpleModeBypassesQuotaCheck(t *testing.T) {
 			resetWeekly:    func(ctx context.Context, id int64, start time.Time) error { return nil },
 			resetMonthly:   func(ctx context.Context, id int64, start time.Time) error { return nil },
 		}
-		subscriptionService := service.NewSubscriptionService(nil, subscriptionRepo, nil, nil, cfg)
+		subscriptionService := service.NewSubscriptionService(nil, subscriptionRepo, nil, nil, cfg, nil)
 		router := newAuthTestRouter(apiKeyService, subscriptionService, cfg)
 
 		w := httptest.NewRecorder()

@@ -529,49 +529,98 @@ func (s *PaymentService) ensurePaymentSubscriptionAssigned(ctx context.Context, 
 		return fmt.Errorf("check subscription assignment audit: %w", err)
 	}
 
+	// 判断是否升级订单（履约时需要软删旧订阅 + 建新订阅）
+	isUpgrade := o.UpgradeFromSubscriptionID != nil
+	var upgradeOldGroupID int64 // 升级订单的旧订阅 groupID，用于 commit 后失效缓存
+
 	recoveredFromNote := false
 	if !alreadyAssigned {
 		orderNote := paymentSubscriptionOrderNote(o.ID)
-		existing, lookupErr := s.subscriptionSvc.userSubRepo.GetByUserIDAndGroupID(txCtx, o.UserID, groupID)
-		switch {
-		case lookupErr == nil && existing != nil && hasPaymentSubscriptionOrderNote(existing.Notes, orderNote):
-			recoveredFromNote = true
-		case lookupErr != nil && !errors.Is(lookupErr, ErrSubscriptionNotFound):
-			return fmt.Errorf("check existing subscription assignment: %w", lookupErr)
-		default:
-			if _, _, err := s.subscriptionSvc.assignOrExtendSubscription(txCtx, &AssignSubscriptionInput{
-				UserID:       o.UserID,
-				GroupID:      groupID,
-				ValidityDays: days,
-				AssignedBy:   0,
-				Notes:        orderNote,
-			}, true); err != nil {
-				return fmt.Errorf("assign subscription: %w", err)
+		if isUpgrade {
+			// 升级分支：软删旧订阅 + 建新订阅（带 plan_id），不复用 assignOrExtendSubscription
+			// （assignOrExtend 会把同 group 已有订阅当续期，升级必须走"软删旧 + 新建新"）
+			if o.PlanID == nil {
+				return fmt.Errorf("upgrade order missing plan_id")
 			}
-		}
+			newPlan, planErr := s.configService.GetPlan(ctx, *o.PlanID)
+			if planErr != nil || newPlan == nil {
+				return fmt.Errorf("resolve upgrade target plan: %w", planErr)
+			}
+			upgradedSub, oldGroupID, upgradeErr := s.subscriptionSvc.FulfillUpgradeSubscription(txCtx, o.UserID, *o.UpgradeFromSubscriptionID, newPlan, orderNote)
+			if upgradeErr != nil {
+				return fmt.Errorf("fulfill subscription upgrade: %w", upgradeErr)
+			}
+			upgradeOldGroupID = oldGroupID
 
-		detail, _ := json.Marshal(map[string]any{
-			"groupID":           groupID,
-			"validityDays":      days,
-			"recoveredFromNote": recoveredFromNote,
-		})
-		if _, err := txClient.PaymentAuditLog.Create().
-			SetOrderID(strconv.FormatInt(o.ID, 10)).
-			SetAction("SUBSCRIPTION_ASSIGNED").
-			SetDetail(string(detail)).
-			SetOperator("system").
-			Save(txCtx); err != nil {
-			if dbent.IsConstraintError(err) {
-				_ = tx.Rollback()
-				claimed, checkErr := hasPaymentSubscriptionAssignmentAudit(ctx, s.entClient, o.ID)
-				if checkErr == nil && claimed {
-					return s.subscriptionSvc.invalidateSubscriptionCaches(o.UserID, groupID)
+			detail, _ := json.Marshal(map[string]any{
+				"groupID":            groupID,
+				"validityDays":       days,
+				"fromSubscriptionID": *o.UpgradeFromSubscriptionID,
+				"toSubscriptionID":   upgradedSub.ID,
+				"oldGroupID":         oldGroupID,
+				"newGroupID":         upgradedSub.GroupID,
+				"prorationCredit":    o.ProrationCredit,
+				"recoveredFromNote":  false,
+			})
+			if _, err := txClient.PaymentAuditLog.Create().
+				SetOrderID(strconv.FormatInt(o.ID, 10)).
+				SetAction("SUBSCRIPTION_UPGRADED").
+				SetDetail(string(detail)).
+				SetOperator("system").
+				Save(txCtx); err != nil {
+				if dbent.IsConstraintError(err) {
+					_ = tx.Rollback()
+					claimed, checkErr := hasPaymentSubscriptionAssignmentAudit(ctx, s.entClient, o.ID)
+					if checkErr == nil && claimed {
+						return s.subscriptionSvc.invalidateSubscriptionCaches(o.UserID, groupID)
+					}
+				}
+				return fmt.Errorf("record subscription upgrade audit: %w", err)
+			}
+		} else {
+			// 普通购买/续费分支（原逻辑）
+			existing, lookupErr := s.subscriptionSvc.userSubRepo.GetByUserIDAndGroupID(txCtx, o.UserID, groupID)
+			switch {
+			case lookupErr == nil && existing != nil && hasPaymentSubscriptionOrderNote(existing.Notes, orderNote):
+				recoveredFromNote = true
+			case lookupErr != nil && !errors.Is(lookupErr, ErrSubscriptionNotFound):
+				return fmt.Errorf("check existing subscription assignment: %w", lookupErr)
+			default:
+				if _, _, err := s.subscriptionSvc.assignOrExtendSubscription(txCtx, &AssignSubscriptionInput{
+					UserID:       o.UserID,
+					GroupID:      groupID,
+					ValidityDays: days,
+					AssignedBy:   0,
+					Notes:        orderNote,
+					PlanID:       o.PlanID,
+				}, true); err != nil {
+					return fmt.Errorf("assign subscription: %w", err)
 				}
 			}
-			return fmt.Errorf("record subscription assignment audit: %w", err)
+
+			detail, _ := json.Marshal(map[string]any{
+				"groupID":           groupID,
+				"validityDays":      days,
+				"recoveredFromNote": recoveredFromNote,
+			})
+			if _, err := txClient.PaymentAuditLog.Create().
+				SetOrderID(strconv.FormatInt(o.ID, 10)).
+				SetAction("SUBSCRIPTION_ASSIGNED").
+				SetDetail(string(detail)).
+				SetOperator("system").
+				Save(txCtx); err != nil {
+				if dbent.IsConstraintError(err) {
+					_ = tx.Rollback()
+					claimed, checkErr := hasPaymentSubscriptionAssignmentAudit(ctx, s.entClient, o.ID)
+					if checkErr == nil && claimed {
+						return s.subscriptionSvc.invalidateSubscriptionCaches(o.UserID, groupID)
+					}
+				}
+				return fmt.Errorf("record subscription assignment audit: %w", err)
+			}
 		}
 	} else {
-		slog.Info("subscription already assigned for order, skipping", "orderID", o.ID, "groupID", groupID)
+		slog.Info("subscription already assigned for order, skipping", "orderID", o.ID, "groupID", groupID, "isUpgrade", isUpgrade)
 	}
 
 	if err := tx.Commit(); err != nil {
@@ -582,6 +631,13 @@ func (s *PaymentService) ensurePaymentSubscriptionAssigned(ctx context.Context, 
 	if err := s.subscriptionSvc.invalidateSubscriptionCaches(o.UserID, groupID); err != nil {
 		return fmt.Errorf("invalidate subscription cache after fulfillment: %w", err)
 	}
+	// 升级订单：旧订阅的 group 缓存也要失效
+	if isUpgrade && upgradeOldGroupID != groupID {
+		if err := s.subscriptionSvc.invalidateSubscriptionCaches(o.UserID, upgradeOldGroupID); err != nil {
+			// 旧 group 缓存失效失败不影响主流程，记录日志即可
+			slog.Warn("invalidate old subscription cache after upgrade", "orderID", o.ID, "oldGroupID", upgradeOldGroupID, "err", err)
+		}
+	}
 	return nil
 }
 
@@ -589,7 +645,7 @@ func hasPaymentSubscriptionAssignmentAudit(ctx context.Context, client *dbent.Cl
 	count, err := client.PaymentAuditLog.Query().
 		Where(
 			paymentauditlog.OrderIDEQ(strconv.FormatInt(orderID, 10)),
-			paymentauditlog.ActionIn("SUBSCRIPTION_ASSIGNED", "SUBSCRIPTION_SUCCESS"),
+			paymentauditlog.ActionIn("SUBSCRIPTION_ASSIGNED", "SUBSCRIPTION_SUCCESS", "SUBSCRIPTION_UPGRADED"),
 		).
 		Limit(1).
 		Count(ctx)

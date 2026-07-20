@@ -50,6 +50,10 @@ const (
 	FieldSubscriptionGroupID = "subscription_group_id"
 	// FieldSubscriptionDays holds the string denoting the subscription_days field in the database.
 	FieldSubscriptionDays = "subscription_days"
+	// FieldUpgradeFromSubscriptionID holds the string denoting the upgrade_from_subscription_id field in the database.
+	FieldUpgradeFromSubscriptionID = "upgrade_from_subscription_id"
+	// FieldProrationCredit holds the string denoting the proration_credit field in the database.
+	FieldProrationCredit = "proration_credit"
 	// FieldProviderInstanceID holds the string denoting the provider_instance_id field in the database.
 	FieldProviderInstanceID = "provider_instance_id"
 	// FieldProviderKey holds the string denoting the provider_key field in the database.
@@ -126,6 +130,8 @@ var Columns = []string{
 	FieldPlanID,
 	FieldSubscriptionGroupID,
 	FieldSubscriptionDays,
+	FieldUpgradeFromSubscriptionID,
+	FieldProrationCredit,
 	FieldProviderInstanceID,
 	FieldProviderKey,
 	FieldProviderSnapshot,
@@ -180,6 +186,8 @@ var (
 	DefaultOrderType string
 	// OrderTypeValidator is a validator for the "order_type" field. It is called by the builders before save.
 	OrderTypeValidator func(string) error
+	// DefaultProrationCredit holds the default value on creation for the "proration_credit" field.
+	DefaultProrationCredit float64
 	// ProviderInstanceIDValidator is a validator for the "provider_instance_id" field. It is called by the builders before save.
 	ProviderInstanceIDValidator func(string) error
 	// ProviderKeyValidator is a validator for the "provider_key" field. It is called by the builders before save.
@@ -302,6 +310,16 @@ func BySubscriptionGroupID(opts ...sql.OrderTermOption) OrderOption {
 // BySubscriptionDays orders the results by the subscription_days field.
 func BySubscriptionDays(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldSubscriptionDays, opts...).ToFunc()
+}
+
+// ByUpgradeFromSubscriptionID orders the results by the upgrade_from_subscription_id field.
+func ByUpgradeFromSubscriptionID(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldUpgradeFromSubscriptionID, opts...).ToFunc()
+}
+
+// ByProrationCredit orders the results by the proration_credit field.
+func ByProrationCredit(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldProrationCredit, opts...).ToFunc()
 }
 
 // ByProviderInstanceID orders the results by the provider_instance_id field.

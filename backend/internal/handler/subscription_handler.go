@@ -1,6 +1,8 @@
 package handler
 
 import (
+	"strconv"
+
 	"github.com/Wei-Shaw/sub2api/internal/handler/dto"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/response"
 	middleware2 "github.com/Wei-Shaw/sub2api/internal/server/middleware"
@@ -185,4 +187,40 @@ func (h *SubscriptionHandler) GetSummary(c *gin.Context) {
 	}
 
 	response.Success(c, summary)
+}
+
+// upgradePreviewRequest 升级预览请求体
+type upgradePreviewRequest struct {
+	NewPlanID int64 `json:"new_plan_id" binding:"required"`
+}
+
+// UpgradePreview 预览升级：计算从当前订阅升级到目标套餐的 proration 抵扣与实付金额。
+// POST /api/v1/subscriptions/:id/upgrade-preview
+func (h *SubscriptionHandler) UpgradePreview(c *gin.Context) {
+	subject, ok := middleware2.GetAuthSubjectFromContext(c)
+	if !ok {
+		response.Unauthorized(c, "User not found in context")
+		return
+	}
+
+	subID, err := strconv.ParseInt(c.Param("id"), 10, 64)
+	if err != nil || subID <= 0 {
+		response.BadRequest(c, "Invalid subscription id")
+		return
+	}
+
+	var req upgradePreviewRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.BadRequest(c, "Invalid request: "+err.Error())
+		return
+	}
+
+	// PreviewUpgrade 内部做归属校验（订阅必须属于当前用户）
+	result, err := h.subscriptionService.PreviewUpgrade(c.Request.Context(), subject.UserID, subID, req.NewPlanID)
+	if err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
+
+	response.Success(c, result)
 }

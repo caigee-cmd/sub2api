@@ -765,6 +765,7 @@ func userSubscriptionFromServiceBase(sub *service.UserSubscription) UserSubscrip
 		ID:                 sub.ID,
 		UserID:             sub.UserID,
 		GroupID:            sub.GroupID,
+		PlanID:             sub.PlanID,
 		StartsAt:           sub.StartsAt,
 		ExpiresAt:          sub.ExpiresAt,
 		Status:             sub.Status,

@@ -59,7 +59,7 @@ func TestRevokeSubscription_InvalidatesL1CacheSynchronously(t *testing.T) {
 			L1Size:       16,
 			L1TTLSeconds: 60,
 		},
-	})
+	}, nil)
 	t.Cleanup(svc.Stop)
 
 	_, err := svc.GetActiveSubscription(context.Background(), 10, 20)
@@ -121,7 +121,7 @@ func TestRestoreSubscription_ExpiredActiveRestoresAsExpired(t *testing.T) {
 			DeletedAt: &deletedAt,
 		},
 	}
-	svc := NewSubscriptionService(groupRepoNoop{}, repo, nil, nil, nil)
+	svc := NewSubscriptionService(groupRepoNoop{}, repo, nil, nil, nil, nil)
 	t.Cleanup(svc.Stop)
 
 	restored, err := svc.RestoreSubscription(context.Background(), 1)
@@ -142,7 +142,7 @@ func TestRestoreSubscription_NotRevokedReturnsConflict(t *testing.T) {
 			ExpiresAt: time.Now().Add(time.Hour),
 		},
 	}
-	svc := NewSubscriptionService(groupRepoNoop{}, repo, nil, nil, nil)
+	svc := NewSubscriptionService(groupRepoNoop{}, repo, nil, nil, nil, nil)
 	t.Cleanup(svc.Stop)
 
 	_, err := svc.RestoreSubscription(context.Background(), 1)
@@ -163,7 +163,7 @@ func TestRestoreSubscription_LiveSubscriptionConflict(t *testing.T) {
 			DeletedAt: &deletedAt,
 		},
 	}
-	svc := NewSubscriptionService(groupRepoNoop{}, repo, nil, nil, nil)
+	svc := NewSubscriptionService(groupRepoNoop{}, repo, nil, nil, nil, nil)
 	t.Cleanup(svc.Stop)
 
 	_, err := svc.RestoreSubscription(context.Background(), 1)

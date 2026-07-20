@@ -267,6 +267,17 @@ func (s *subscriptionUserSubRepoStub) Update(_ context.Context, sub *UserSubscri
 	return nil
 }
 
+// Delete 软删除订阅（从 byID / byUserGroup 移除，模拟软删后查询不可见）
+func (s *subscriptionUserSubRepoStub) Delete(_ context.Context, id int64) error {
+	existing := s.byID[id]
+	if existing == nil {
+		return nil // 匹配真实 repo：删除不存在的记录不报错
+	}
+	delete(s.byID, id)
+	delete(s.byUserGroup, s.key(existing.UserID, existing.GroupID))
+	return nil
+}
+
 func TestAssignSubscriptionReuseWhenSemanticsMatch(t *testing.T) {
 	start := time.Now().Add(-time.Hour)
 	groupRepo := &subscriptionGroupRepoStub{
@@ -283,7 +294,7 @@ func TestAssignSubscriptionReuseWhenSemanticsMatch(t *testing.T) {
 		Notes:     "init",
 	})
 
-	svc := NewSubscriptionService(groupRepo, subRepo, nil, nil, nil)
+	svc := NewSubscriptionService(groupRepo, subRepo, nil, nil, nil, nil)
 	sub, err := svc.AssignSubscription(context.Background(), &AssignSubscriptionInput{
 		UserID:       1001,
 		GroupID:      1,
@@ -470,7 +481,7 @@ func TestAssignSubscriptionConflictWhenSemanticsMismatch(t *testing.T) {
 		Notes:     "old-note",
 	})
 
-	svc := NewSubscriptionService(groupRepo, subRepo, nil, nil, nil)
+	svc := NewSubscriptionService(groupRepo, subRepo, nil, nil, nil, nil)
 	_, err := svc.AssignSubscription(context.Background(), &AssignSubscriptionInput{
 		UserID:       2001,
 		GroupID:      1,
@@ -509,7 +520,7 @@ func TestBulkAssignSubscriptionCreatedReusedAndConflict(t *testing.T) {
 		Notes:     "same-note",
 	})
 
-	svc := NewSubscriptionService(groupRepo, subRepo, nil, nil, nil)
+	svc := NewSubscriptionService(groupRepo, subRepo, nil, nil, nil, nil)
 	result, err := svc.BulkAssignSubscription(context.Background(), &BulkAssignSubscriptionInput{
 		UserIDs:      []int64{1, 2, 3},
 		GroupID:      1,
@@ -584,7 +595,7 @@ func TestAssignSubscriptionKeepsWorkingWhenIdempotencyStoreUnavailable(t *testin
 		SetDefaultIdempotencyCoordinator(nil)
 	})
 
-	svc := NewSubscriptionService(groupRepo, subRepo, nil, nil, nil)
+	svc := NewSubscriptionService(groupRepo, subRepo, nil, nil, nil, nil)
 	sub, err := svc.AssignSubscription(context.Background(), &AssignSubscriptionInput{
 		UserID:       9001,
 		GroupID:      1,
@@ -646,7 +657,7 @@ func TestAssignSubscriptionGroupTypeValidation(t *testing.T) {
 		group: &Group{ID: 1, SubscriptionType: SubscriptionTypeStandard},
 	}
 	subRepo := newSubscriptionUserSubRepoStub()
-	svc := NewSubscriptionService(groupRepo, subRepo, nil, nil, nil)
+	svc := NewSubscriptionService(groupRepo, subRepo, nil, nil, nil, nil)
 
 	_, err := svc.AssignSubscription(context.Background(), &AssignSubscriptionInput{
 		UserID:       1,

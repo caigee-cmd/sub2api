@@ -365,6 +365,54 @@ func (_u *PaymentOrderUpdate) ClearSubscriptionDays() *PaymentOrderUpdate {
 	return _u
 }
 
+// SetUpgradeFromSubscriptionID sets the "upgrade_from_subscription_id" field.
+func (_u *PaymentOrderUpdate) SetUpgradeFromSubscriptionID(v int64) *PaymentOrderUpdate {
+	_u.mutation.ResetUpgradeFromSubscriptionID()
+	_u.mutation.SetUpgradeFromSubscriptionID(v)
+	return _u
+}
+
+// SetNillableUpgradeFromSubscriptionID sets the "upgrade_from_subscription_id" field if the given value is not nil.
+func (_u *PaymentOrderUpdate) SetNillableUpgradeFromSubscriptionID(v *int64) *PaymentOrderUpdate {
+	if v != nil {
+		_u.SetUpgradeFromSubscriptionID(*v)
+	}
+	return _u
+}
+
+// AddUpgradeFromSubscriptionID adds value to the "upgrade_from_subscription_id" field.
+func (_u *PaymentOrderUpdate) AddUpgradeFromSubscriptionID(v int64) *PaymentOrderUpdate {
+	_u.mutation.AddUpgradeFromSubscriptionID(v)
+	return _u
+}
+
+// ClearUpgradeFromSubscriptionID clears the value of the "upgrade_from_subscription_id" field.
+func (_u *PaymentOrderUpdate) ClearUpgradeFromSubscriptionID() *PaymentOrderUpdate {
+	_u.mutation.ClearUpgradeFromSubscriptionID()
+	return _u
+}
+
+// SetProrationCredit sets the "proration_credit" field.
+func (_u *PaymentOrderUpdate) SetProrationCredit(v float64) *PaymentOrderUpdate {
+	_u.mutation.ResetProrationCredit()
+	_u.mutation.SetProrationCredit(v)
+	return _u
+}
+
+// SetNillableProrationCredit sets the "proration_credit" field if the given value is not nil.
+func (_u *PaymentOrderUpdate) SetNillableProrationCredit(v *float64) *PaymentOrderUpdate {
+	if v != nil {
+		_u.SetProrationCredit(*v)
+	}
+	return _u
+}
+
+// AddProrationCredit adds value to the "proration_credit" field.
+func (_u *PaymentOrderUpdate) AddProrationCredit(v float64) *PaymentOrderUpdate {
+	_u.mutation.AddProrationCredit(v)
+	return _u
+}
+
 // SetProviderInstanceID sets the "provider_instance_id" field.
 func (_u *PaymentOrderUpdate) SetProviderInstanceID(v string) *PaymentOrderUpdate {
 	_u.mutation.SetProviderInstanceID(v)
@@ -941,6 +989,21 @@ func (_u *PaymentOrderUpdate) sqlSave(ctx context.Context) (_node int, err error
 	if _u.mutation.SubscriptionDaysCleared() {
 		_spec.ClearField(paymentorder.FieldSubscriptionDays, field.TypeInt)
 	}
+	if value, ok := _u.mutation.UpgradeFromSubscriptionID(); ok {
+		_spec.SetField(paymentorder.FieldUpgradeFromSubscriptionID, field.TypeInt64, value)
+	}
+	if value, ok := _u.mutation.AddedUpgradeFromSubscriptionID(); ok {
+		_spec.AddField(paymentorder.FieldUpgradeFromSubscriptionID, field.TypeInt64, value)
+	}
+	if _u.mutation.UpgradeFromSubscriptionIDCleared() {
+		_spec.ClearField(paymentorder.FieldUpgradeFromSubscriptionID, field.TypeInt64)
+	}
+	if value, ok := _u.mutation.ProrationCredit(); ok {
+		_spec.SetField(paymentorder.FieldProrationCredit, field.TypeFloat64, value)
+	}
+	if value, ok := _u.mutation.AddedProrationCredit(); ok {
+		_spec.AddField(paymentorder.FieldProrationCredit, field.TypeFloat64, value)
+	}
 	if value, ok := _u.mutation.ProviderInstanceID(); ok {
 		_spec.SetField(paymentorder.FieldProviderInstanceID, field.TypeString, value)
 	}
@@ -1425,6 +1488,54 @@ func (_u *PaymentOrderUpdateOne) AddSubscriptionDays(v int) *PaymentOrderUpdateO
 // ClearSubscriptionDays clears the value of the "subscription_days" field.
 func (_u *PaymentOrderUpdateOne) ClearSubscriptionDays() *PaymentOrderUpdateOne {
 	_u.mutation.ClearSubscriptionDays()
+	return _u
+}
+
+// SetUpgradeFromSubscriptionID sets the "upgrade_from_subscription_id" field.
+func (_u *PaymentOrderUpdateOne) SetUpgradeFromSubscriptionID(v int64) *PaymentOrderUpdateOne {
+	_u.mutation.ResetUpgradeFromSubscriptionID()
+	_u.mutation.SetUpgradeFromSubscriptionID(v)
+	return _u
+}
+
+// SetNillableUpgradeFromSubscriptionID sets the "upgrade_from_subscription_id" field if the given value is not nil.
+func (_u *PaymentOrderUpdateOne) SetNillableUpgradeFromSubscriptionID(v *int64) *PaymentOrderUpdateOne {
+	if v != nil {
+		_u.SetUpgradeFromSubscriptionID(*v)
+	}
+	return _u
+}
+
+// AddUpgradeFromSubscriptionID adds value to the "upgrade_from_subscription_id" field.
+func (_u *PaymentOrderUpdateOne) AddUpgradeFromSubscriptionID(v int64) *PaymentOrderUpdateOne {
+	_u.mutation.AddUpgradeFromSubscriptionID(v)
+	return _u
+}
+
+// ClearUpgradeFromSubscriptionID clears the value of the "upgrade_from_subscription_id" field.
+func (_u *PaymentOrderUpdateOne) ClearUpgradeFromSubscriptionID() *PaymentOrderUpdateOne {
+	_u.mutation.ClearUpgradeFromSubscriptionID()
+	return _u
+}
+
+// SetProrationCredit sets the "proration_credit" field.
+func (_u *PaymentOrderUpdateOne) SetProrationCredit(v float64) *PaymentOrderUpdateOne {
+	_u.mutation.ResetProrationCredit()
+	_u.mutation.SetProrationCredit(v)
+	return _u
+}
+
+// SetNillableProrationCredit sets the "proration_credit" field if the given value is not nil.
+func (_u *PaymentOrderUpdateOne) SetNillableProrationCredit(v *float64) *PaymentOrderUpdateOne {
+	if v != nil {
+		_u.SetProrationCredit(*v)
+	}
+	return _u
+}
+
+// AddProrationCredit adds value to the "proration_credit" field.
+func (_u *PaymentOrderUpdateOne) AddProrationCredit(v float64) *PaymentOrderUpdateOne {
+	_u.mutation.AddProrationCredit(v)
 	return _u
 }
 
@@ -2033,6 +2144,21 @@ func (_u *PaymentOrderUpdateOne) sqlSave(ctx context.Context) (_node *PaymentOrd
 	}
 	if _u.mutation.SubscriptionDaysCleared() {
 		_spec.ClearField(paymentorder.FieldSubscriptionDays, field.TypeInt)
+	}
+	if value, ok := _u.mutation.UpgradeFromSubscriptionID(); ok {
+		_spec.SetField(paymentorder.FieldUpgradeFromSubscriptionID, field.TypeInt64, value)
+	}
+	if value, ok := _u.mutation.AddedUpgradeFromSubscriptionID(); ok {
+		_spec.AddField(paymentorder.FieldUpgradeFromSubscriptionID, field.TypeInt64, value)
+	}
+	if _u.mutation.UpgradeFromSubscriptionIDCleared() {
+		_spec.ClearField(paymentorder.FieldUpgradeFromSubscriptionID, field.TypeInt64)
+	}
+	if value, ok := _u.mutation.ProrationCredit(); ok {
+		_spec.SetField(paymentorder.FieldProrationCredit, field.TypeFloat64, value)
+	}
+	if value, ok := _u.mutation.AddedProrationCredit(); ok {
+		_spec.AddField(paymentorder.FieldProrationCredit, field.TypeFloat64, value)
 	}
 	if value, ok := _u.mutation.ProviderInstanceID(); ok {
 		_spec.SetField(paymentorder.FieldProviderInstanceID, field.TypeString, value)
