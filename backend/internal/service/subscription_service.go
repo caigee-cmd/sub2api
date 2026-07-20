@@ -1365,8 +1365,10 @@ func (s *SubscriptionService) resolveOldPlanForSubscription(ctx context.Context,
 		}
 	}
 
-	// 容忍最多 ±3 天的误差（月套餐按 30 天算，实际可能 28-31 天）
-	if bestPlan != nil && bestDelta >= 0 && bestDelta <= 3 {
+	// 只要该 group 下有 for_sale plan 就取最接近的那个（不限制天数误差）。
+	// 这样 admin 直接分配的非标准天数订阅（1天/7天/365天等）也能升级，
+	// proration 按实际剩余天数 + 该 plan 的 price/validity 计算。
+	if bestPlan != nil {
 		return bestPlan, nil
 	}
 	return nil, ErrSubscriptionUpgradeNoOldPlan

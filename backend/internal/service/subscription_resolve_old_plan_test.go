@@ -90,9 +90,10 @@ func TestResolveOldPlanForSubscription_NoEligiblePlan(t *testing.T) {
 	require.ErrorIs(t, err, ErrSubscriptionUpgradeNoOldPlan)
 }
 
-// TestResolveOldPlanForSubscription_FallbackToleratesSmallDelta
-// 月套餐按 30 天算，实际订阅可能是 31 天（自然月），应容忍 ±3 天误差
-func TestResolveOldPlanForSubscription_FallbackToleratesSmallDelta(t *testing.T) {
+// TestResolveOldPlanForSubscription_FallbackAnyDelta
+// admin 直接分配的订阅天数可能不匹配任何 plan（1天/7天/365天等），
+// 只要 group 下有 for_sale plan 就取最接近的那个，不限制天数误差。
+func TestResolveOldPlanForSubscription_FallbackAnyDelta(t *testing.T) {
 	ctx := context.Background()
 	client := newPaymentConfigServiceTestClient(t)
 	configSvc := &PaymentConfigService{entClient: client}
@@ -109,15 +110,43 @@ func TestResolveOldPlanForSubscription_FallbackToleratesSmallDelta(t *testing.T)
 	require.NoError(t, err)
 
 	svc := &SubscriptionService{configService: configSvc}
-	// 订阅实际 32 天（plan 是 30 天，差 2 天，在容忍范围内）
-	sub := &UserSubscription{
-		GroupID:   10,
-		PlanID:    nil,
-		StartsAt:  time.Now().AddDate(0, 0, -2),  // 2 天前开始
-		ExpiresAt: time.Now().AddDate(0, 0, 30), // 30 天后过期 = 共 32 天
-	}
 
-	got, err := svc.resolveOldPlanForSubscription(ctx, sub)
-	require.NoError(t, err)
-	require.Equal(t, plan.ID, got.ID)
+	// 场景 1：订阅实际 32 天（plan 30 天，差 2 天）-> 应匹配
+	t.Run("32 days matches 30-day plan", func(t *testing.T) {
+		sub := &UserSubscription{
+			GroupID:   10,
+			PlanID:    nil,
+			StartsAt:  time.Now().AddDate(0, 0, -2),
+			ExpiresAt: time.Now().AddDate(0, 0, 30), // 共 32 天
+		}
+		got, err := svc.resolveOldPlanForSubscription(ctx, sub)
+		require.NoError(t, err)
+		require.Equal(t, plan.ID, got.ID)
+	})
+
+	// 场景 2：admin 分配 1 天的测试订阅 -> 应匹配 30 天 plan（差距大也接受）
+	t.Run("1 day matches 30-day plan", func(t *testing.T) {
+		sub := &UserSubscription{
+			GroupID:   10,
+			PlanID:    nil,
+			StartsAt:  time.Now(),
+			ExpiresAt: time.Now().AddDate(0, 0, 1), // 共 1 天
+		}
+		got, err := svc.resolveOldPlanForSubscription(ctx, sub)
+		require.NoError(t, err)
+		require.Equal(t, plan.ID, got.ID)
+	})
+
+	// 场景 3：admin 分配 365 天 -> 应匹配 30 天 plan（取最接近的）
+	t.Run("365 days matches 30-day plan", func(t *testing.T) {
+		sub := &UserSubscription{
+			GroupID:   10,
+			PlanID:    nil,
+			StartsAt:  time.Now(),
+			ExpiresAt: time.Now().AddDate(0, 0, 365),
+		}
+		got, err := svc.resolveOldPlanForSubscription(ctx, sub)
+		require.NoError(t, err)
+		require.Equal(t, plan.ID, got.ID)
+	})
 }
