@@ -1270,15 +1270,13 @@ func (s *SubscriptionService) PreviewUpgrade(ctx context.Context, userID, subscr
 	if sub.Status != SubscriptionStatusActive || sub.IsExpired() {
 		return nil, ErrSubscriptionUpgradeNotActive
 	}
-	if sub.PlanID == nil {
-		// 历史订阅（admin 分配 / 兑换码）没有 plan_id，无法算 proration
-		return nil, ErrSubscriptionUpgradeNoOldPlan
-	}
 
 	// 2. 取 oldPlan / newPlan
-	oldPlan, err := s.configService.GetPlan(ctx, *sub.PlanID)
+	// oldPlan 优先用 sub.PlanID（新购买透传）；为空时按订阅实际有效期天数
+	// 匹配 group 下 for_sale plan（兼容历史订阅/admin 分配/兑换码）。
+	oldPlan, err := s.resolveOldPlanForSubscription(ctx, sub)
 	if err != nil {
-		return nil, ErrSubscriptionUpgradeNoOldPlan
+		return nil, err
 	}
 	newPlan, err := s.configService.GetPlan(ctx, newPlanID)
 	if err != nil || !newPlan.ForSale {
@@ -1314,6 +1312,64 @@ func (s *SubscriptionService) PreviewUpgrade(ctx context.Context, userID, subscr
 		Payable:       proration.Payable,
 		NewExpiresAt:  proration.NewExpiresAt,
 	}, nil
+}
+
+// resolveOldPlanForSubscription 推算订阅的原始套餐：
+//  . sub.PlanID 非空 -> 直接 GetPlan（新购买透传 plan_id 的场景）
+//  2. sub.PlanID 为空 -> 按 (expires_at - starts_at) 实际天数匹配 group 下 for_sale plan，
+//     取折算天数最接近的那个。兼容历史订阅（admin 分配/兑换码/旧购买）。
+//
+// 匹配不上（group 下无 for_sale plan，或天数差距过大）返回 ErrSubscriptionUpgradeNoOldPlan。
+func (s *SubscriptionService) resolveOldPlanForSubscription(ctx context.Context, sub *UserSubscription) (*dbent.SubscriptionPlan, error) {
+	// 优先用 plan_id
+	if sub.PlanID != nil {
+		plan, err := s.configService.GetPlan(ctx, *sub.PlanID)
+		if err == nil && plan != nil {
+			return plan, nil
+		}
+		// plan_id 指向的 plan 已删除 -> 继续 fallback
+	}
+
+	// Fallback: 按实际有效期天数匹配 group 下 for_sale plan
+	if sub.StartsAt.IsZero() || sub.ExpiresAt.IsZero() {
+		return nil, ErrSubscriptionUpgradeNoOldPlan
+	}
+	actualDays := int(sub.ExpiresAt.Sub(sub.StartsAt).Hours() / 24)
+	if actualDays <= 0 {
+		return nil, ErrSubscriptionUpgradeNoOldPlan
+	}
+
+	plans, err := s.configService.ListPlansForSale(ctx)
+	if err != nil {
+		return nil, ErrSubscriptionUpgradeNoOldPlan
+	}
+
+	var bestPlan *dbent.SubscriptionPlan
+	bestDelta := -1
+	for _, p := range plans {
+		if p.GroupID != sub.GroupID {
+			continue
+		}
+		planDays := psComputeValidityDays(p.ValidityDays, p.ValidityUnit)
+		delta := planDays - actualDays
+		if delta < 0 {
+			delta = -delta
+		}
+		// 精确匹配直接返回
+		if delta == 0 {
+			return p, nil
+		}
+		if bestDelta == -1 || delta < bestDelta {
+			bestDelta = delta
+			bestPlan = p
+		}
+	}
+
+	// 容忍最多 ±3 天的误差（月套餐按 30 天算，实际可能 28-31 天）
+	if bestPlan != nil && bestDelta >= 0 && bestDelta <= 3 {
+		return bestPlan, nil
+	}
+	return nil, ErrSubscriptionUpgradeNoOldPlan
 }
 
 // ResolveUpgradeFromSubscription 在下单时校验升级订单的合法性并返回 proration 结果。
