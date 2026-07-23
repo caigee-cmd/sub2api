@@ -79,6 +79,9 @@ func (s *OpenAIGatewayService) forwardAnthropicViaRawChatCompletions(
 	if thinkingBody, injected := EnsureQwenEnableThinking(chatBody, upstreamModel); injected {
 		chatBody = thinkingBody
 	}
+	if identityBody, injected := InjectIdentitySystemPrompt(chatBody, originalModel, account); injected {
+		chatBody = identityBody
+	}
 	// Unlike forwardResponsesViaRawChatCompletions, applyOpenAIFastPolicyToBody
 	// is intentionally skipped: Anthropic Messages bodies carry no service_tier,
 	// so the converted Chat Completions body never contains one and the policy

@@ -96,6 +96,9 @@ func (s *OpenAIGatewayService) forwardAsRawChatCompletions(
 	if thinkingBody, injected := EnsureQwenEnableThinking(upstreamBody, upstreamModel); injected {
 		upstreamBody = thinkingBody
 	}
+	if identityBody, injected := InjectIdentitySystemPrompt(upstreamBody, originalModel, account); injected {
+		upstreamBody = identityBody
+	}
 
 	// 4. Apply OpenAI fast policy on the CC body
 	updatedBody, policyErr := s.applyOpenAIFastPolicyToBody(ctx, account, upstreamModel, upstreamBody)

@@ -1373,6 +1373,49 @@ func EnsureQwenEnableThinking(body []byte, upstreamModel string) ([]byte, bool) 
 	return modified, true
 }
 
+// InjectIdentitySystemPrompt prepends a per-model identity system message to
+// the Chat Completions messages array. The prompt is looked up by the
+// client-facing model name (originalModel) in account extra
+// "identity_system_prompts". Used to make a mapped model present itself
+// under a different identity (e.g. glm-5.2 served by qwen3.8-max-preview).
+//
+// The system message is inserted at position 0, before any existing messages.
+// If the body has no messages array or the model has no configured prompt,
+// the body is returned unchanged.
+func InjectIdentitySystemPrompt(body []byte, originalModel string, account *Account) ([]byte, bool) {
+	prompts := account.GetIdentitySystemPrompts()
+	if prompts == nil {
+		return body, false
+	}
+	prompt, ok := prompts[originalModel]
+	if !ok || strings.TrimSpace(prompt) == "" {
+		return body, false
+	}
+
+	sysMsg, err := json.Marshal(map[string]string{"role": "system", "content": prompt})
+	if err != nil {
+		return body, false
+	}
+
+	messagesResult := gjson.GetBytes(body, "messages")
+	if !messagesResult.Exists() || !messagesResult.IsArray() {
+		return body, false
+	}
+
+	items := make([][]byte, 0, messagesResult.Get("#").Int()+1)
+	items = append(items, sysMsg)
+	messagesResult.ForEach(func(_, msg gjson.Result) bool {
+		items = append(items, []byte(msg.Raw))
+		return true
+	})
+
+	modified, err := sjson.SetRawBytes(body, "messages", buildJSONArrayRaw(items))
+	if err != nil {
+		return body, false
+	}
+	return modified, true
+}
+
 func normalizeGLMOpenAIReasoningEffort(raw string) string {
 	value := strings.ToLower(strings.TrimSpace(raw))
 	if value == "" {

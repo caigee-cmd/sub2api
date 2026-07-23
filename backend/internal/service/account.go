@@ -928,6 +928,17 @@ func (a *Account) GetExtraString(key string) string {
 	return ""
 }
 
+// GetIdentitySystemPrompts returns per-model identity system prompts from
+// account extra. Key is the client-facing model name (originalModel), value
+// is the system prompt to prepend. Used to make a mapped model present
+// itself under a different identity (e.g. glm-5.2 → qwen3.8-max-preview).
+func (a *Account) GetIdentitySystemPrompts() map[string]string {
+	if a.Extra == nil {
+		return nil
+	}
+	return stringMappingFromRaw(a.Extra["identity_system_prompts"])
+}
+
 func (a *Account) GetClaudeUserID() string {
 	if v := strings.TrimSpace(a.GetExtraString("claude_user_id")); v != "" {
 		return v
