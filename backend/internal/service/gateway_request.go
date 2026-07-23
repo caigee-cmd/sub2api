@@ -1345,6 +1345,34 @@ func NormalizeGLMOpenAIReasoningEffort(body []byte, mappedModel string) ([]byte,
 	return modified, true
 }
 
+// EnsureQwenEnableThinking force-sets enable_thinking=true for Qwen models.
+//
+// Alibaba Cloud MaaS (token-plan / DashScope) requires enable_thinking to be
+// true for certain qwen* models (e.g. qwen3.8-max-preview); requests with
+// false or absent values get a 400 "The value of the enable_thinking
+// parameter is restricted to True."
+//
+// The Responses→CC and Anthropic→CC conversions drop this field
+// (ChatCompletionsRequest has no enable_thinking), and some clients
+// explicitly send false — both trigger the upstream 400.
+//
+// Note: the guard checks the *upstream* model (after model_mapping), not the
+// client-facing model. E.g. glm-5.2 maps to qwen3.8-max-preview upstream.
+func EnsureQwenEnableThinking(body []byte, upstreamModel string) ([]byte, bool) {
+	id := strings.ToLower(strings.TrimSpace(upstreamModel))
+	if !strings.HasPrefix(id, "qwen") {
+		return body, false
+	}
+	if gjson.GetBytes(body, "enable_thinking").Bool() {
+		return body, false
+	}
+	modified, err := sjson.SetBytes(body, "enable_thinking", true)
+	if err != nil {
+		return body, false
+	}
+	return modified, true
+}
+
 func normalizeGLMOpenAIReasoningEffort(raw string) string {
 	value := strings.ToLower(strings.TrimSpace(raw))
 	if value == "" {

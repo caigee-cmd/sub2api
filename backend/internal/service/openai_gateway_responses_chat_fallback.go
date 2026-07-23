@@ -80,6 +80,9 @@ func (s *OpenAIGatewayService) forwardResponsesViaRawChatCompletions(
 		}
 		return nil, err
 	}
+	if thinkingBody, injected := EnsureQwenEnableThinking(chatBody, upstreamModel); injected {
+		chatBody = thinkingBody
+	}
 	if serviceTier == nil {
 		serviceTier = extractOpenAIServiceTierFromBody(chatBody)
 	}
