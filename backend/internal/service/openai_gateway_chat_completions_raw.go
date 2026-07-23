@@ -262,6 +262,7 @@ func (s *OpenAIGatewayService) streamRawChatCompletions(
 	requestID := resp.Header.Get("x-request-id")
 	writeStreamHeaders := s.newStreamHeaderWriter(c, resp.Header)
 	scanner := s.newUpstreamSSEScanner(resp.Body)
+	needsModelRewrite := originalModel != upstreamModel
 
 	var usage OpenAIUsage
 	var firstTokenMs *int
@@ -315,6 +316,13 @@ func (s *OpenAIGatewayService) streamRawChatCompletions(
 				if firstTokenMs == nil && !usageOnlyChunk {
 					elapsed := int(time.Since(startTime).Milliseconds())
 					firstTokenMs = &elapsed
+				}
+				// Rewrite upstream model back to the client-facing model so
+				// model_mapping is not leaked in SSE chunks.
+				if needsModelRewrite {
+					if rewritten, err := sjson.SetBytes([]byte(trimmedPayload), "model", originalModel); err == nil {
+						line = "data: " + string(rewritten)
+					}
 				}
 			}
 		}
@@ -435,6 +443,14 @@ func (s *OpenAIGatewayService) bufferRawChatCompletions(
 	var usage OpenAIUsage
 	if parsedUsage, ok := extractOpenAIUsageFromJSONBytes(respBody); ok {
 		usage = parsedUsage
+	}
+
+	// Rewrite upstream model back to the client-facing model so
+	// model_mapping is not leaked in the response body.
+	if originalModel != upstreamModel {
+		if rewritten, err := sjson.SetBytes(respBody, "model", originalModel); err == nil {
+			respBody = rewritten
+		}
 	}
 
 	if s.responseHeaderFilter != nil {
