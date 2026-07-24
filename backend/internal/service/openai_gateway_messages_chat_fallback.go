@@ -79,6 +79,9 @@ func (s *OpenAIGatewayService) forwardAnthropicViaRawChatCompletions(
 	if thinkingBody, injected := EnsureQwenEnableThinking(chatBody, upstreamModel); injected {
 		chatBody = thinkingBody
 	}
+	if strippedBody, stripped := StripQwenReasoningEffort(chatBody, upstreamModel); stripped {
+		chatBody = strippedBody
+	}
 	if identityBody, injected := InjectIdentitySystemPrompt(chatBody, originalModel, account); injected {
 		chatBody = identityBody
 	}

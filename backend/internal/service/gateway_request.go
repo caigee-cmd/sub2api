@@ -1373,6 +1373,38 @@ func EnsureQwenEnableThinking(body []byte, upstreamModel string) ([]byte, bool) 
 	return modified, true
 }
 
+// StripQwenReasoningEffort removes the reasoning_effort / reasoning.effort
+// fields from the request body for Qwen models.
+//
+// Alibaba Cloud MaaS expects parameters.chat_template_kwargs.reasoning_effort
+// to be a boolean; OpenAI-compatible clients send string enums ("high",
+// "medium", "low") which trigger a 400 "Input should be a valid boolean".
+// Since EnsureQwenEnableThinking already forces enable_thinking=true, the
+// reasoning_effort field is meaningless for this upstream — strip it.
+func StripQwenReasoningEffort(body []byte, upstreamModel string) ([]byte, bool) {
+	id := strings.ToLower(strings.TrimSpace(upstreamModel))
+	if !strings.HasPrefix(id, "qwen") {
+		return body, false
+	}
+	changed := false
+	for _, path := range []string{"reasoning_effort", "reasoning.effort"} {
+		if gjson.GetBytes(body, path).Exists() {
+			if modified, err := sjson.DeleteBytes(body, path); err == nil {
+				body = modified
+				changed = true
+			}
+		}
+	}
+	// Clean up empty "reasoning" object left after deleting "reasoning.effort".
+	reasoning := gjson.GetBytes(body, "reasoning")
+	if reasoning.Exists() && reasoning.IsObject() && len(reasoning.Map()) == 0 {
+		if modified, err := sjson.DeleteBytes(body, "reasoning"); err == nil {
+			body = modified
+		}
+	}
+	return body, changed
+}
+
 // InjectIdentitySystemPrompt prepends a per-model identity system message to
 // the Chat Completions messages array. The prompt is looked up by the
 // client-facing model name (originalModel) in account extra
