@@ -1363,14 +1363,29 @@ func EnsureQwenEnableThinking(body []byte, upstreamModel string) ([]byte, bool) 
 	if !strings.HasPrefix(id, "qwen") {
 		return body, false
 	}
-	if gjson.GetBytes(body, "enable_thinking").Bool() {
-		return body, false
+
+	modified := body
+	changed := false
+
+	if !gjson.GetBytes(modified, "enable_thinking").Bool() {
+		b, err := sjson.SetBytes(modified, "enable_thinking", true)
+		if err == nil {
+			modified = b
+			changed = true
+		}
 	}
-	modified, err := sjson.SetBytes(body, "enable_thinking", true)
-	if err != nil {
-		return body, false
+
+	// Cap thinking depth to avoid unbounded reasoning loops.
+	// Respect client-supplied values; only inject when absent.
+	if !gjson.GetBytes(modified, "thinking_budget").Exists() {
+		b, err := sjson.SetBytes(modified, "thinking_budget", 4096)
+		if err == nil {
+			modified = b
+			changed = true
+		}
 	}
-	return modified, true
+
+	return modified, changed
 }
 
 // StripQwenReasoningEffort removes the reasoning_effort / reasoning.effort
