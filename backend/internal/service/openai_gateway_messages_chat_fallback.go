@@ -177,6 +177,7 @@ func (s *OpenAIGatewayService) streamChatCompletionsAsAnthropic(
 
 	anthropicState := apicompat.NewChatCompletionsToAnthropicStreamState(originalModel)
 	anthropicState.StripReasoning = shouldStripReasoningForAnthropic(upstreamModel)
+	anthropicState.StripQwenXML = strings.HasPrefix(strings.ToLower(upstreamModel), "qwen")
 	clientDisconnected := false
 
 	// 与 responses 兄弟不同：客户端断开后仍继续做事件转换（喂 anthropicState），

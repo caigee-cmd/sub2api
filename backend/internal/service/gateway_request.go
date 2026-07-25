@@ -1384,7 +1384,7 @@ func EnsureQwenEnableThinking(body []byte, upstreamModel string) ([]byte, bool) 
 	if !gjson.GetBytes(modified, "thinking_budget").Exists() {
 		budget := 4096
 		if gjson.GetBytes(modified, "tools").IsArray() {
-			budget = 10240
+			budget = 6144
 		}
 		b, err := sjson.SetBytes(modified, "thinking_budget", budget)
 		if err == nil {

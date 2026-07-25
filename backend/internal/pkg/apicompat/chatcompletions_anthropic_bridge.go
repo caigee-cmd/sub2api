@@ -444,6 +444,8 @@ func chatMessageToAnthropicBlocks(message ChatMessage, stripReasoning bool) []An
 	if !stripReasoning && text == "" && strings.TrimSpace(message.ReasoningContent) != "" && len(message.ToolCalls) == 0 {
 		text = message.ReasoningContent
 	}
+	// Qwen XML tool-call leak: strip internal markup that escaped into text.
+	text = StripQwenXMLToolCallTags(text)
 	if text != "" || len(message.ToolCalls) == 0 {
 		blocks = append(blocks, AnthropicContentBlock{Type: "text", Text: text})
 	}
@@ -564,6 +566,10 @@ type ChatCompletionsToAnthropicStreamState struct {
 	// signature, Claude Code renders it as garbled text).
 	StripReasoning bool
 
+	// StripQwenXML enables the XML tool-call leak filter for text deltas.
+	StripQwenXML bool
+	xmlFilter    *QwenXMLStreamFilter
+
 	FinishReason string
 
 	InputTokens              int
@@ -631,11 +637,21 @@ func ChatCompletionsChunkToAnthropicEvents(
 
 		// Text content → text block (closes any open thinking block first).
 		if choice.Delta.Content != nil && *choice.Delta.Content != "" {
+			textDelta := *choice.Delta.Content
+			if state.StripQwenXML {
+				if state.xmlFilter == nil {
+					state.xmlFilter = NewQwenXMLStreamFilter(true)
+				}
+				textDelta = state.xmlFilter.Write(textDelta)
+				if textDelta == "" {
+					continue
+				}
+			}
 			events = append(events, closeCCAnthropicBlockIfOpen(state, "thinking")...)
 			events = append(events, ensureCCAnthropicTextBlock(state)...)
 			events = append(events, ccAnthropicDelta(state, &AnthropicDelta{
 				Type: "text_delta",
-				Text: *choice.Delta.Content,
+				Text: textDelta,
 			})...)
 		}
 
@@ -679,6 +695,17 @@ func FinalizeChatCompletionsAnthropicStream(state *ChatCompletionsToAnthropicStr
 			callID := state.pendingToolCallID[idx]
 			events = append(events, closeCCAnthropicBlock(state)...)
 			events = append(events, announceCCAnthropicToolBlock(state, idx, callID, "")...)
+		}
+	}
+
+	// Flush any buffered text held back by the XML tool-call filter.
+	if state.xmlFilter != nil {
+		if flushed := state.xmlFilter.Flush(); flushed != "" {
+			events = append(events, ensureCCAnthropicTextBlock(state)...)
+			events = append(events, ccAnthropicDelta(state, &AnthropicDelta{
+				Type: "text_delta",
+				Text: flushed,
+			})...)
 		}
 	}
 
