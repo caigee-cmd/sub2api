@@ -1377,12 +1377,16 @@ func EnsureQwenEnableThinking(body []byte, upstreamModel string) ([]byte, bool) 
 
 	// Cap thinking depth to avoid unbounded reasoning loops.
 	// Respect client-supplied values; only inject when absent.
-	// 10240 (was 4096): with many tools (e.g. Claude Code sends 15+),
-	// a tight budget truncates reasoning mid-tool-selection, causing the
-	// model to fall back to XML chat-template tool-call format leaked into
-	// text output. 10240 gives enough room for tool-heavy prompts.
+	// Adaptive budget: tool-heavy requests (e.g. Claude Code with 15+ tools)
+	// need more room — a tight budget truncates reasoning mid-tool-selection,
+	// causing the model to fall back to XML chat-template format leaked into
+	// text output. Plain chat needs less and benefits from faster responses.
 	if !gjson.GetBytes(modified, "thinking_budget").Exists() {
-		b, err := sjson.SetBytes(modified, "thinking_budget", 10240)
+		budget := 4096
+		if gjson.GetBytes(modified, "tools").IsArray() {
+			budget = 10240
+		}
+		b, err := sjson.SetBytes(modified, "thinking_budget", budget)
 		if err == nil {
 			modified = b
 			changed = true
