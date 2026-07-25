@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"math"
 	"net/http"
+	"regexp"
 	"strconv"
 	"strings"
 	"sync/atomic"
@@ -1706,8 +1707,36 @@ func (h *GatewayHandler) mapUpstreamError(statusCode int) (int, string, string) 
 	}
 }
 
+// sanitizeClientMessage strips internal details (provider URLs, request IDs,
+// documentation links) from error messages before they reach the client.
+// This prevents leaking upstream infrastructure information regardless of
+// which passthrough rule or code path produced the message.
+var clientMessagePatterns = []*regexp.Regexp{
+	regexp.MustCompile(`(?i)https?://\S+`),                        // URLs
+	regexp.MustCompile(`(?i)request\s*id:\s*\S+`),                 // request IDs
+	regexp.MustCompile(`(?i)docs\.\w+\.\w+/\d+`),                  // doc links
+	regexp.MustCompile(`(?i)volcengine|dashscope|aliyuncs\.com`),  // provider names
+}
+
+func sanitizeClientMessage(msg string) string {
+	if msg == "" {
+		return msg
+	}
+	sanitized := msg
+	for _, p := range clientMessagePatterns {
+		sanitized = p.ReplaceAllString(sanitized, "")
+	}
+	sanitized = strings.TrimSpace(sanitized)
+	// If sanitization gutted the message, fall back to a generic one.
+	if sanitized == "" || len(sanitized) < 10 {
+		return "The requested model is temporarily unavailable. Please try again later."
+	}
+	return sanitized
+}
+
 // handleStreamingAwareError handles errors that may occur after streaming has started
 func (h *GatewayHandler) handleStreamingAwareError(c *gin.Context, status int, errType, message string, streamStarted bool) {
+	message = sanitizeClientMessage(message)
 	if streamStarted {
 		// 响应状态码已固化为 200（ping/部分数据已 flush），错误只能就地以 SSE 帧回传。
 		// 标记本次流内错误，供 ops_error_logger 补记——否则该中间件按 status>=400 采集，
