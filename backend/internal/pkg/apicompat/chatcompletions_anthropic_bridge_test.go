@@ -308,7 +308,7 @@ func TestChatCompletionsResponseToAnthropic_TextOnly(t *testing.T) {
 		Usage: &ChatUsage{PromptTokens: 5, CompletionTokens: 2, TotalTokens: 7},
 	}
 
-	out := ChatCompletionsResponseToAnthropic(resp, "claude-sonnet-4-20250514")
+	out := ChatCompletionsResponseToAnthropic(resp, "claude-sonnet-4-20250514", false)
 	require.Equal(t, "chatcmpl-1", out.ID)
 	require.Equal(t, "claude-sonnet-4-20250514", out.Model)
 	require.Len(t, out.Content, 1)
@@ -340,7 +340,7 @@ func TestChatCompletionsResponseToAnthropic_ToolUse(t *testing.T) {
 		}},
 	}
 
-	out := ChatCompletionsResponseToAnthropic(resp, "claude-sonnet-4-20250514")
+	out := ChatCompletionsResponseToAnthropic(resp, "claude-sonnet-4-20250514", false)
 	require.Len(t, out.Content, 1)
 	require.Equal(t, "tool_use", out.Content[0].Type)
 	require.Equal(t, "call_1", out.Content[0].ID)
@@ -363,7 +363,7 @@ func TestChatCompletionsResponseToAnthropic_ReasoningOnlyFallback(t *testing.T) 
 		}},
 	}
 
-	out := ChatCompletionsResponseToAnthropic(resp, "claude-sonnet-4-20250514")
+	out := ChatCompletionsResponseToAnthropic(resp, "claude-sonnet-4-20250514", false)
 	// thinking block + text block (fallback uses reasoning as visible text)
 	require.Len(t, out.Content, 2)
 	require.Equal(t, "thinking", out.Content[0].Type)
@@ -383,7 +383,7 @@ func TestChatCompletionsResponseToAnthropic_FinishReasonLength(t *testing.T) {
 		}},
 	}
 
-	out := ChatCompletionsResponseToAnthropic(resp, "claude-sonnet-4-20250514")
+	out := ChatCompletionsResponseToAnthropic(resp, "claude-sonnet-4-20250514", false)
 	require.Equal(t, "max_tokens", AnthropicStopReasonString(out.StopReason))
 }
 
@@ -394,7 +394,7 @@ func TestChatCompletionsResponseToAnthropic_EmptyChoices(t *testing.T) {
 		Choices: []ChatChoice{},
 	}
 
-	out := ChatCompletionsResponseToAnthropic(resp, "claude-sonnet-4-20250514")
+	out := ChatCompletionsResponseToAnthropic(resp, "claude-sonnet-4-20250514", false)
 	require.Len(t, out.Content, 1)
 	require.Equal(t, "text", out.Content[0].Type)
 	require.Equal(t, "", out.Content[0].Text)
@@ -421,7 +421,7 @@ func TestChatCompletionsResponseToAnthropic_CacheTokens(t *testing.T) {
 		},
 	}
 
-	out := ChatCompletionsResponseToAnthropic(resp, "claude-sonnet-4-20250514")
+	out := ChatCompletionsResponseToAnthropic(resp, "claude-sonnet-4-20250514", false)
 	// input = prompt(100) - cached(30) - cacheCreation(10) = 60
 	require.Equal(t, 60, out.Usage.InputTokens)
 	require.Equal(t, 5, out.Usage.OutputTokens)
@@ -430,7 +430,7 @@ func TestChatCompletionsResponseToAnthropic_CacheTokens(t *testing.T) {
 }
 
 func TestChatCompletionsResponseToAnthropic_NilResponse(t *testing.T) {
-	out := ChatCompletionsResponseToAnthropic(nil, "claude-sonnet-4-20250514")
+	out := ChatCompletionsResponseToAnthropic(nil, "claude-sonnet-4-20250514", false)
 	require.Len(t, out.Content, 1)
 	require.Equal(t, "text", out.Content[0].Type)
 	require.Equal(t, "end_turn", AnthropicStopReasonString(out.StopReason), "nil response must not produce an empty stop_reason")
@@ -671,7 +671,7 @@ func TestDirectBridge_NonStreamingMatchesDoubleConversion(t *testing.T) {
 	}
 
 	// Direct bridge
-	direct := ChatCompletionsResponseToAnthropic(resp, "claude-sonnet-4-20250514")
+	direct := ChatCompletionsResponseToAnthropic(resp, "claude-sonnet-4-20250514", false)
 
 	// Double-conversion bridge
 	responsesResp := ChatCompletionsResponseToResponses(resp, "claude-sonnet-4-20250514", nil, false, nil)
@@ -986,7 +986,7 @@ func TestDirectBridge_NonStreamingMatchesDoubleConversion_CacheWriteTokens(t *te
 		},
 	}
 
-	direct := ChatCompletionsResponseToAnthropic(resp, "claude-sonnet-4-20250514")
+	direct := ChatCompletionsResponseToAnthropic(resp, "claude-sonnet-4-20250514", false)
 
 	responsesResp := ChatCompletionsResponseToResponses(resp, "claude-sonnet-4-20250514", nil, false, nil)
 	double := ResponsesToAnthropic(responsesResp, "claude-sonnet-4-20250514")
@@ -1007,7 +1007,7 @@ func TestChatCompletionsResponseToAnthropic_GeneratesIDWhenMissing(t *testing.T)
 		}},
 	}
 
-	out := ChatCompletionsResponseToAnthropic(resp, "claude-sonnet-4-20250514")
+	out := ChatCompletionsResponseToAnthropic(resp, "claude-sonnet-4-20250514", false)
 	require.NotEmpty(t, out.ID, "response id must be generated when the upstream omits one")
 }
 
@@ -1056,7 +1056,7 @@ func TestDirectBridge_NonStreamingMatchesDoubleConversion_EmptyChoices(t *testin
 	// matching the double-conversion chain ("end_turn").
 	resp := &ChatCompletionsResponse{ID: "chatcmpl-empty", Model: "deepseek-v4-pro"}
 
-	direct := ChatCompletionsResponseToAnthropic(resp, "claude-sonnet-4-20250514")
+	direct := ChatCompletionsResponseToAnthropic(resp, "claude-sonnet-4-20250514", false)
 
 	responsesResp := ChatCompletionsResponseToResponses(resp, "claude-sonnet-4-20250514", nil, false, nil)
 	double := ResponsesToAnthropic(responsesResp, "claude-sonnet-4-20250514")
@@ -1085,6 +1085,6 @@ func TestChatCompletionsResponseToAnthropic_ContentFilterWithToolUse(t *testing.
 		}},
 	}
 
-	out := ChatCompletionsResponseToAnthropic(resp, "claude-sonnet-4-20250514")
+	out := ChatCompletionsResponseToAnthropic(resp, "claude-sonnet-4-20250514", false)
 	require.Equal(t, "tool_use", AnthropicStopReasonString(out.StopReason))
 }

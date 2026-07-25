@@ -374,7 +374,10 @@ func joinResponsesContentPartText(parts []ResponsesContentPart) string {
 // directly into an Anthropic Messages response, without materializing a
 // ResponsesResponse. It is semantically equivalent to composing
 // ChatCompletionsResponseToResponses + ResponsesToAnthropic.
-func ChatCompletionsResponseToAnthropic(resp *ChatCompletionsResponse, model string) *AnthropicResponse {
+//
+// stripReasoning drops reasoning_content from the response (used for upstreams
+// whose reasoning format is incompatible with Anthropic thinking, e.g. Qwen3).
+func ChatCompletionsResponseToAnthropic(resp *ChatCompletionsResponse, model string, stripReasoning bool) *AnthropicResponse {
 	out := &AnthropicResponse{
 		Type:  "message",
 		Role:  "assistant",
@@ -389,7 +392,7 @@ func ChatCompletionsResponseToAnthropic(resp *ChatCompletionsResponse, model str
 
 		if len(resp.Choices) > 0 {
 			choice := resp.Choices[0]
-			out.Content = chatMessageToAnthropicBlocks(choice.Message)
+			out.Content = chatMessageToAnthropicBlocks(choice.Message, stripReasoning)
 			out.StopReason = AnthropicStopReasonPtr(chatFinishReasonToAnthropicStopReason(choice.FinishReason, out.Content))
 			// "length" → "max_tokens" is handled by chatFinishReasonToAnthropicStopReason;
 			// Anthropic conveys max-tokens via stop_reason only, no incomplete_details field.
@@ -421,10 +424,13 @@ func ChatCompletionsResponseToAnthropic(resp *ChatCompletionsResponse, model str
 // Anthropic content blocks. Reasoning content → thinking block; text content →
 // text block; tool_calls → tool_use blocks. Mirrors chatMessageToResponsesOutput
 // + the reasoning→thinking mapping in ResponsesToAnthropic.
-func chatMessageToAnthropicBlocks(message ChatMessage) []AnthropicContentBlock {
+//
+// stripReasoning drops reasoning_content entirely (used for upstreams whose
+// reasoning format is incompatible with Anthropic thinking, e.g. Qwen3).
+func chatMessageToAnthropicBlocks(message ChatMessage, stripReasoning bool) []AnthropicContentBlock {
 	var blocks []AnthropicContentBlock
 
-	if message.ReasoningContent != "" {
+	if !stripReasoning && message.ReasoningContent != "" {
 		blocks = append(blocks, AnthropicContentBlock{
 			Type:     "thinking",
 			Thinking: message.ReasoningContent,
@@ -434,7 +440,8 @@ func chatMessageToAnthropicBlocks(message ChatMessage) []AnthropicContentBlock {
 	text := chatMessageContentText(message.Content)
 	// DeepSeek reasoning-only fallback: when there is no text and no tool calls,
 	// surface the reasoning content as visible text so the turn isn't empty.
-	if text == "" && strings.TrimSpace(message.ReasoningContent) != "" && len(message.ToolCalls) == 0 {
+	// Skipped when stripReasoning is set (the reasoning is intentionally hidden).
+	if !stripReasoning && text == "" && strings.TrimSpace(message.ReasoningContent) != "" && len(message.ToolCalls) == 0 {
 		text = message.ReasoningContent
 	}
 	if text != "" || len(message.ToolCalls) == 0 {
@@ -551,6 +558,12 @@ type ChatCompletionsToAnthropicStreamState struct {
 	// Responses bridge's ReasoningIndex, but since blocks are sequential we
 	// reuse the single ContentBlockIndex counter.
 
+	// StripReasoning drops reasoning_content deltas instead of converting them
+	// to Anthropic thinking blocks. Used for upstreams whose reasoning format
+	// is incompatible with Anthropic's extended thinking (e.g. Qwen3 — no
+	// signature, Claude Code renders it as garbled text).
+	StripReasoning bool
+
 	FinishReason string
 
 	InputTokens              int
@@ -607,8 +620,8 @@ func ChatCompletionsChunkToAnthropicEvents(
 	events = append(events, ensureCCAnthropicMessageStart(state)...)
 
 	for _, choice := range chunk.Choices {
-		// Reasoning content → thinking block.
-		if choice.Delta.ReasoningContent != nil && *choice.Delta.ReasoningContent != "" {
+		// Reasoning content → thinking block (skipped when StripReasoning is set).
+		if !state.StripReasoning && choice.Delta.ReasoningContent != nil && *choice.Delta.ReasoningContent != "" {
 			events = append(events, ensureCCAnthropicThinkingBlock(state)...)
 			events = append(events, ccAnthropicDelta(state, &AnthropicDelta{
 				Type:     "thinking_delta",

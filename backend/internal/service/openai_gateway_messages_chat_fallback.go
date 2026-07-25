@@ -142,7 +142,7 @@ func (s *OpenAIGatewayService) bufferChatCompletionsAsAnthropic(
 	if err != nil {
 		return nil, err
 	}
-	anthropicResp := apicompat.ChatCompletionsResponseToAnthropic(ccResp, originalModel)
+	anthropicResp := apicompat.ChatCompletionsResponseToAnthropic(ccResp, originalModel, shouldStripReasoningForAnthropic(upstreamModel))
 
 	if s.responseHeaderFilter != nil {
 		responseheaders.WriteFilteredHeaders(c.Writer.Header(), resp.Header, s.responseHeaderFilter)
@@ -176,6 +176,7 @@ func (s *OpenAIGatewayService) streamChatCompletionsAsAnthropic(
 	writeStreamHeaders := s.newStreamHeaderWriter(c, resp.Header)
 
 	anthropicState := apicompat.NewChatCompletionsToAnthropicStreamState(originalModel)
+	anthropicState.StripReasoning = shouldStripReasoningForAnthropic(upstreamModel)
 	clientDisconnected := false
 
 	// 与 responses 兄弟不同：客户端断开后仍继续做事件转换（喂 anthropicState），
@@ -257,4 +258,12 @@ func (s *OpenAIGatewayService) streamChatCompletionsAsAnthropic(
 		FirstTokenMs:     scan.FirstTokenMs,
 		ClientDisconnect: clientDisconnected,
 	}, nil
+}
+
+// shouldStripReasoningForAnthropic returns true for upstream models whose
+// reasoning_content format is incompatible with Anthropic's extended thinking
+// (no signature, different semantics). Qwen3's thinking output rendered as
+// garbled text in Claude Code; stripping it avoids the issue entirely.
+func shouldStripReasoningForAnthropic(upstreamModel string) bool {
+	return strings.HasPrefix(strings.ToLower(upstreamModel), "qwen")
 }
