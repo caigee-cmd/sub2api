@@ -427,13 +427,22 @@ func ChatCompletionsResponseToAnthropic(resp *ChatCompletionsResponse, model str
 //
 // stripReasoning drops reasoning_content entirely (used for upstreams whose
 // reasoning format is incompatible with Anthropic thinking, e.g. Qwen3).
+// ccAnthropicDummySignature is a placeholder signature for thinking blocks
+// produced by upstreams that don't provide Anthropic-compatible signatures
+// (e.g. Qwen reasoning_content). Claude Code requires a non-empty signature
+// on thinking blocks; this satisfies the schema. On the next turn, the
+// request-side conversion (anthropicAssistantToChatMessages) drops thinking
+// blocks entirely, so the dummy value never reaches the upstream.
+const ccAnthropicDummySignature = "sub2api-cc-bridge"
+
 func chatMessageToAnthropicBlocks(message ChatMessage, stripReasoning bool) []AnthropicContentBlock {
 	var blocks []AnthropicContentBlock
 
 	if !stripReasoning && message.ReasoningContent != "" {
 		blocks = append(blocks, AnthropicContentBlock{
-			Type:     "thinking",
-			Thinking: message.ReasoningContent,
+			Type:      "thinking",
+			Thinking:  message.ReasoningContent,
+			Signature: ccAnthropicDummySignature,
 		})
 	}
 
@@ -932,6 +941,17 @@ func closeCCAnthropicBlock(state *ChatCompletionsToAnthropicStreamState) []Anthr
 			Delta: &AnthropicDelta{
 				Type:        "input_json_delta",
 				PartialJSON: "{}",
+			},
+		})
+	}
+	// Thinking blocks require a signature; emit a dummy one before closing.
+	if state.CurrentBlockType == "thinking" {
+		events = append(events, AnthropicStreamEvent{
+			Type:  "content_block_delta",
+			Index: &idx,
+			Delta: &AnthropicDelta{
+				Type:      "signature_delta",
+				Signature: ccAnthropicDummySignature,
 			},
 		})
 	}

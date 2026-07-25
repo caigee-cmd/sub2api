@@ -263,8 +263,12 @@ func (s *OpenAIGatewayService) streamChatCompletionsAsAnthropic(
 
 // shouldStripReasoningForAnthropic returns true for upstream models whose
 // reasoning_content format is incompatible with Anthropic's extended thinking
-// (no signature, different semantics). Qwen3's thinking output rendered as
-// garbled text in Claude Code; stripping it avoids the issue entirely.
+// (no signature, different semantics).
+//
+// Qwen3 previously stripped here, but we now pass its reasoning as thinking
+// blocks with a dummy signature — the request-side conversion
+// (anthropicAssistantToChatMessages) naturally drops thinking blocks when
+// converting back to Chat Completions, so round-trip is safe.
 func shouldStripReasoningForAnthropic(upstreamModel string) bool {
-	return strings.HasPrefix(strings.ToLower(upstreamModel), "qwen")
+	return false
 }
