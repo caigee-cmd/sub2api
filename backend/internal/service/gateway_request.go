@@ -1382,14 +1382,33 @@ func EnsureQwenEnableThinking(body []byte, upstreamModel string) ([]byte, bool) 
 	// causing the model to fall back to XML chat-template format leaked into
 	// text output. Plain chat needs less and benefits from faster responses.
 	if !gjson.GetBytes(modified, "thinking_budget").Exists() {
-		budget := 4096
+		budget := 16384
 		if gjson.GetBytes(modified, "tools").IsArray() {
-			budget = 6144
+			budget = 32768
 		}
 		b, err := sjson.SetBytes(modified, "thinking_budget", budget)
 		if err == nil {
 			modified = b
 			changed = true
+		}
+	}
+
+	// Ensure max_completion_tokens / max_tokens exceeds thinking_budget.
+	// Upstream rejects requests where max_completion_tokens < thinking_budget
+	// (e.g. "max_completion_tokens [128] must be greater than thinking_budget
+	// [4096]"). Clients or model configs may carry a tiny max tokens value that
+	// conflicts with the budget we just injected (or the client supplied).
+	budget := int(gjson.GetBytes(modified, "thinking_budget").Int())
+	if budget > 0 {
+		minMax := budget + 4096 // headroom for the actual response after thinking
+		for _, field := range []string{"max_completion_tokens", "max_tokens"} {
+			v := gjson.GetBytes(modified, field)
+			if v.Exists() && int(v.Int()) < minMax {
+				if b, err := sjson.SetBytes(modified, field, minMax); err == nil {
+					modified = b
+					changed = true
+				}
+			}
 		}
 	}
 
