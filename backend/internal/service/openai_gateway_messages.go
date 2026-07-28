@@ -257,6 +257,10 @@ func (s *OpenAIGatewayService) ForwardAsAnthropic(
 		return nil, policyErr
 	}
 	responsesBody = updatedBody
+	// Kimi upstreams reject the reasoning param; strip it before sending.
+	if strippedBody, stripped := StripKimiReasoning(responsesBody, upstreamModel, originalModel); stripped {
+		responsesBody = strippedBody
+	}
 	grokCacheIdentity := ""
 	if account.Platform == PlatformGrok {
 		grokIntentBody := responsesBody

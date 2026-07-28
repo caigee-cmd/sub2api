@@ -86,7 +86,7 @@ func (s *OpenAIGatewayService) forwardResponsesViaRawChatCompletions(
 	if strippedBody, stripped := StripQwenReasoningEffort(chatBody, upstreamModel); stripped {
 		chatBody = strippedBody
 	}
-	if strippedBody, stripped := StripKimiReasoning(chatBody, upstreamModel); stripped {
+	if strippedBody, stripped := StripKimiReasoning(chatBody, upstreamModel, originalModel); stripped {
 		chatBody = strippedBody
 	}
 	if identityBody, injected := InjectIdentitySystemPrompt(chatBody, originalModel, account); injected {

@@ -1450,9 +1450,15 @@ func StripQwenReasoningEffort(body []byte, upstreamModel string) ([]byte, bool) 
 // StripKimiReasoning removes the reasoning / reasoning_effort fields from the
 // request body for Kimi models (kimi-* / moonshot-*). Kimi's OpenAI-compatible
 // API rejects these with a 400 "reasoning is not supported by current model".
-func StripKimiReasoning(body []byte, upstreamModel string) ([]byte, bool) {
-	id := strings.ToLower(strings.TrimSpace(upstreamModel))
-	if !strings.HasPrefix(id, "kimi") && !strings.HasPrefix(id, "moonshot") {
+//
+// Checks both upstreamModel and originalModel because model_mapping may resolve
+// kimi-for-coding → kimi-k2.6 → ark-code-latest, hiding the kimi prefix.
+func StripKimiReasoning(body []byte, upstreamModel, originalModel string) ([]byte, bool) {
+	isKimi := func(m string) bool {
+		id := strings.ToLower(strings.TrimSpace(m))
+		return strings.HasPrefix(id, "kimi") || strings.HasPrefix(id, "moonshot")
+	}
+	if !isKimi(upstreamModel) && !isKimi(originalModel) {
 		return body, false
 	}
 	changed := false
