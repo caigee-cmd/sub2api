@@ -1447,6 +1447,26 @@ func StripQwenReasoningEffort(body []byte, upstreamModel string) ([]byte, bool) 
 	return body, changed
 }
 
+// StripKimiReasoning removes the reasoning / reasoning_effort fields from the
+// request body for Kimi models (kimi-* / moonshot-*). Kimi's OpenAI-compatible
+// API rejects these with a 400 "reasoning is not supported by current model".
+func StripKimiReasoning(body []byte, upstreamModel string) ([]byte, bool) {
+	id := strings.ToLower(strings.TrimSpace(upstreamModel))
+	if !strings.HasPrefix(id, "kimi") && !strings.HasPrefix(id, "moonshot") {
+		return body, false
+	}
+	changed := false
+	for _, path := range []string{"reasoning_effort", "reasoning"} {
+		if gjson.GetBytes(body, path).Exists() {
+			if modified, err := sjson.DeleteBytes(body, path); err == nil {
+				body = modified
+				changed = true
+			}
+		}
+	}
+	return body, changed
+}
+
 // InjectIdentitySystemPrompt prepends a per-model identity system message to
 // the Chat Completions messages array. The prompt is looked up by the
 // client-facing model name (originalModel) in account extra
