@@ -270,7 +270,11 @@ func (s *OpenAIGatewayService) streamRawChatCompletions(
 
 	// Qwen XML leak filter: strip thinking/tool tags from content and
 	// reasoning_content deltas. Only active for Qwen upstream models.
-	qwenFilterEnabled := strings.HasPrefix(strings.ToLower(upstreamModel), "qwen")
+	// XML tag stripping is disabled: it mangled legitimate output (e.g. compact
+	// summaries wrapped in <summary>, Responses API markup) and the cosmetic
+	// benefit never justified the corruption risk. Filter code is kept for a
+	// future tool-call-only mode if ever needed.
+	qwenFilterEnabled := false
 	contentFilter := apicompat.NewQwenXMLStreamFilter(qwenFilterEnabled)
 	reasoningFilter := apicompat.NewQwenXMLStreamFilter(qwenFilterEnabled)
 
@@ -503,8 +507,8 @@ func (s *OpenAIGatewayService) bufferRawChatCompletions(
 		}
 	}
 
-	// Strip leaked Qwen XML tags from content/reasoning_content (non-streaming).
-	if strings.HasPrefix(strings.ToLower(upstreamModel), "qwen") {
+	// XML tag stripping disabled (see streaming path comment above).
+	if false && strings.HasPrefix(strings.ToLower(upstreamModel), "qwen") {
 		choices := gjson.GetBytes(respBody, "choices")
 		if choices.IsArray() {
 			for i := range choices.Array() {

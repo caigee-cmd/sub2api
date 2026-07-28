@@ -12,18 +12,18 @@ import (
 // tags and their closing variants). This happens primarily under tool-heavy
 // prompts when thinking_budget truncates reasoning mid-tool-selection.
 //
-// Additionally, client system prompts sometimes instruct the model to wrap
-// thinking in XML tags (analysis, summary, think, thinking, thought,
-// reflection, reasoning). When enable_thinking=true forces reasoning into
-// reasoning_content, those tags leak into the client's reasoning fold as
-// visible XML markup.
+// This filter strips only genuine tool-call markup from response text. It is
+// applied only to Qwen upstream models and is a no-op for all other providers.
 //
-// This filter strips all such leaked tags from response text. It is applied
-// only to Qwen upstream models and is a no-op for all other providers.
+// NOTE: thinking/reasoning-style tags (analysis, summary, think, thinking,
+// thought, reflection, reasoning) were previously stripped here, but they are
+// NOT tool-call markup — clients legitimately instruct models to wrap output
+// in them (e.g. Claude Code's compact/summary prompt). Stripping them mangled
+// compact summaries ("head and tail gone, middle intact") and corrupted the
+// context the client rebuilt afterwards. They are deliberately left in text.
 
-// qwenXMLTagNames enumerates all tag names this filter strips: tool-call
-// tags plus thinking/reasoning tags triggered by client prompts.
-var qwenXMLTagNames = `tool_response|invoke|parameter|tool_call|function_call|antml:invoke|antml:parameter|analysis|summary|think|thinking|thought|reflection|reasoning`
+// qwenXMLTagNames enumerates the tool-call tag names this filter strips.
+var qwenXMLTagNames = `tool_response|invoke|parameter|tool_call|function_call|antml:invoke|antml:parameter`
 
 // qwenXMLToolCallPattern matches complete XML tags (tool-call + thinking):
 // opening tags (with optional attributes), closing tags, and self-closing tags.

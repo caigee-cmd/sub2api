@@ -177,7 +177,9 @@ func (s *OpenAIGatewayService) streamChatCompletionsAsAnthropic(
 
 	anthropicState := apicompat.NewChatCompletionsToAnthropicStreamState(originalModel)
 	anthropicState.StripReasoning = shouldStripReasoningForAnthropic(upstreamModel)
-	anthropicState.StripQwenXML = strings.HasPrefix(strings.ToLower(upstreamModel), "qwen")
+	// XML tag stripping disabled: it corrupted legitimate output (compact
+	// summaries, Responses API markup). See openai_gateway_chat_completions_raw.go.
+	anthropicState.StripQwenXML = false
 	clientDisconnected := false
 
 	// 与 responses 兄弟不同：客户端断开后仍继续做事件转换（喂 anthropicState），

@@ -837,7 +837,7 @@ func extractCustomToolCallInput(arguments string) string {
 // toolSearch 表示客户端声明了 tool_search 工具（见 HasToolSearchTool），代理工具
 // 的调用会还原为 tool_search_call 项；namespaceTools 是 namespace 子工具的摊平名
 // 映射（见 NamespaceToolNames），命中的调用还原为带 namespace 字段的 function_call 项。
-func ChatCompletionsResponseToResponses(resp *ChatCompletionsResponse, model string, customTools map[string]bool, toolSearch bool, namespaceTools map[string]NamespacedToolName) *ResponsesResponse {
+func ChatCompletionsResponseToResponses(resp *ChatCompletionsResponse, model string, customTools map[string]bool, toolSearch bool, namespaceTools map[string]NamespacedToolName, stripReasoning bool) *ResponsesResponse {
 	id := ""
 	if resp != nil {
 		id = resp.ID
@@ -862,7 +862,7 @@ func ChatCompletionsResponseToResponses(resp *ChatCompletionsResponse, model str
 
 	if len(resp.Choices) > 0 {
 		choice := resp.Choices[0]
-		out.Output = chatMessageToResponsesOutput(choice.Message, customTools, toolSearch, namespaceTools)
+		out.Output = chatMessageToResponsesOutput(choice.Message, customTools, toolSearch, namespaceTools, stripReasoning)
 		if choice.FinishReason == "length" {
 			out.Status = "incomplete"
 			out.IncompleteDetails = &ResponsesIncompleteDetails{Reason: "max_output_tokens"}
@@ -877,9 +877,9 @@ func ChatCompletionsResponseToResponses(resp *ChatCompletionsResponse, model str
 	return out
 }
 
-func chatMessageToResponsesOutput(message ChatMessage, customTools map[string]bool, toolSearch bool, namespaceTools map[string]NamespacedToolName) []ResponsesOutput {
+func chatMessageToResponsesOutput(message ChatMessage, customTools map[string]bool, toolSearch bool, namespaceTools map[string]NamespacedToolName, stripReasoning bool) []ResponsesOutput {
 	var outputs []ResponsesOutput
-	if message.ReasoningContent != "" {
+	if !stripReasoning && message.ReasoningContent != "" {
 		outputs = append(outputs, ResponsesOutput{
 			Type: "reasoning",
 			ID:   generateItemID(),
@@ -1101,6 +1101,11 @@ type ChatCompletionsToResponsesStreamState struct {
 	// 尚未到达时延迟宣告，待名字可判定类型后再补发（见 announceChatToolItem）。
 	toolAnnounced map[int]bool
 
+	// StripReasoning suppresses reasoning output items in the Responses stream.
+	// Used for upstreams (e.g. Qwen) whose reasoning_content is not native
+	// OpenAI encrypted reasoning and breaks clients expecting a single output item.
+	StripReasoning bool
+
 	FinishReason string
 	Usage        *ResponsesUsage
 }
@@ -1155,14 +1160,16 @@ func ChatCompletionsChunkToResponsesEvents(
 		// delta, otherwise a strict client discards the delta. The leading
 		// empty-string reasoning delta upstreams send is filtered out.
 		if choice.Delta.ReasoningContent != nil && *choice.Delta.ReasoningContent != "" {
-			events = append(events, ensureChatReasoningItem(state)...)
 			_, _ = state.Reasoning.WriteString(*choice.Delta.ReasoningContent)
-			events = append(events, chatToResponsesEvent(state, "response.reasoning_summary_text.delta", &ResponsesStreamEvent{
-				OutputIndex:  state.ReasoningIndex,
-				SummaryIndex: 0,
-				Delta:        *choice.Delta.ReasoningContent,
-				ItemID:       state.ReasoningItemID,
-			}))
+			if !state.StripReasoning {
+				events = append(events, ensureChatReasoningItem(state)...)
+				events = append(events, chatToResponsesEvent(state, "response.reasoning_summary_text.delta", &ResponsesStreamEvent{
+					OutputIndex:  state.ReasoningIndex,
+					SummaryIndex: 0,
+					Delta:        *choice.Delta.ReasoningContent,
+					ItemID:       state.ReasoningItemID,
+				}))
+			}
 		}
 		if choice.Delta.Content != nil && *choice.Delta.Content != "" {
 			// First real content closes the reasoning item, then opens the
@@ -1600,7 +1607,7 @@ func closeChatToolItems(state *ChatCompletionsToResponsesStreamState) []Response
 
 func (state *ChatCompletionsToResponsesStreamState) chatOutput() []ResponsesOutput {
 	var outputs []ResponsesOutput
-	if state.Reasoning.Len() > 0 {
+	if !state.StripReasoning && state.Reasoning.Len() > 0 {
 		outputs = append(outputs, ResponsesOutput{
 			Type: "reasoning",
 			ID:   generateItemID(),
