@@ -28,7 +28,7 @@ func TestExtractOpenAIReasoningEffortFromBodyModelCandidates(t *testing.T) {
 			name:       "后缀推导回退到原始模型（OAuth 上游模型已剥后缀）",
 			body:       bodyWithoutEffort,
 			candidates: []string{"gpt-5.4", "gpt-5.4", "gpt-5.4-xhigh"},
-			want:       "xhigh",
+			want:       "high",
 		},
 		{
 			name:       "GPT-5.6 后缀 max 经原始模型推导保留",
@@ -43,10 +43,10 @@ func TestExtractOpenAIReasoningEffortFromBodyModelCandidates(t *testing.T) {
 			want:       "max",
 		},
 		{
-			name:       "显式 max 非 5.6 首候选仍折叠为 xhigh",
+			name:       "显式 max 非 5.6 首候选仍折叠为 high",
 			body:       bodyWithMax,
 			candidates: []string{"gpt-5.4", "sol"},
-			want:       "xhigh",
+			want:       "high",
 		},
 		{
 			name:       "所有候选均无后缀时返回 nil",
@@ -118,5 +118,5 @@ func TestOpenAIGatewayServiceForwardOAuthDerivesEffortFromSuffixModel(t *testing
 	require.NotNil(t, result)
 	require.Equal(t, "gpt-5.3-codex", gjson.GetBytes(upstream.lastBody, "model").String())
 	require.NotNil(t, result.ReasoningEffort)
-	require.Equal(t, "xhigh", *result.ReasoningEffort)
+	require.Equal(t, "high", *result.ReasoningEffort)
 }

@@ -1290,7 +1290,10 @@ func normalizeOpenAIReasoningEffort(raw string) string {
 	case "low", "medium", "high":
 		return value
 	case "xhigh", "extrahigh", "max":
-		return "xhigh"
+		// Clamp to "high": most OpenAI-compatible upstreams only accept
+		// {low, medium, high}. GPT-5.6 "max" is preserved earlier by
+		// normalizeOpenAIReasoningEffortForModel before reaching here.
+		return "high"
 	default:
 		// Only store known effort levels for now to keep UI consistent.
 		return ""

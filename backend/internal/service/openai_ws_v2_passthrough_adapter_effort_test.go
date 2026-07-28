@@ -27,7 +27,7 @@ func TestWSPassthroughUsageMeta_InitFromFirstFrame_NonGPT56FallsBackToXHigh(t *t
 
 	got := meta.reasoningEffort.Load()
 	require.NotNil(t, got)
-	require.Equal(t, "xhigh", *got, "non-5.6 model should normalize max to xhigh")
+	require.Equal(t, "high", *got, "non-5.6 model should normalize max to high")
 }
 
 func TestWSPassthroughUsageMeta_UpdateFromResponseCreate_MappedModelCandidate(t *testing.T) {
