@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Wei-Shaw/sub2api/internal/pkg/apicompat"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/logger"
 	"github.com/Wei-Shaw/sub2api/internal/util/responseheaders"
 	"github.com/gin-gonic/gin"
@@ -267,6 +268,12 @@ func (s *OpenAIGatewayService) streamRawChatCompletions(
 	scanner := s.newUpstreamSSEScanner(resp.Body)
 	needsModelRewrite := originalModel != upstreamModel
 
+	// Qwen XML leak filter: strip thinking/tool tags from content and
+	// reasoning_content deltas. Only active for Qwen upstream models.
+	qwenFilterEnabled := strings.HasPrefix(strings.ToLower(upstreamModel), "qwen")
+	contentFilter := apicompat.NewQwenXMLStreamFilter(qwenFilterEnabled)
+	reasoningFilter := apicompat.NewQwenXMLStreamFilter(qwenFilterEnabled)
+
 	var usage OpenAIUsage
 	var firstTokenMs *int
 	clientDisconnected := false
@@ -320,13 +327,36 @@ func (s *OpenAIGatewayService) streamRawChatCompletions(
 					elapsed := int(time.Since(startTime).Milliseconds())
 					firstTokenMs = &elapsed
 				}
+
+				payloadBytes := []byte(trimmedPayload)
+
 				// Rewrite upstream model back to the client-facing model so
 				// model_mapping is not leaked in SSE chunks.
 				if needsModelRewrite {
-					if rewritten, err := sjson.SetBytes([]byte(trimmedPayload), "model", originalModel); err == nil {
-						line = "data: " + string(rewritten)
+					if rewritten, err := sjson.SetBytes(payloadBytes, "model", originalModel); err == nil {
+						payloadBytes = rewritten
 					}
 				}
+
+				// Strip leaked Qwen XML tags from content/reasoning_content.
+				if qwenFilterEnabled {
+					if v := gjson.GetBytes(payloadBytes, "choices.0.delta.content"); v.Exists() && v.String() != "" {
+						if filtered := contentFilter.Write(v.String()); filtered != v.String() {
+							if rewritten, err := sjson.SetBytes(payloadBytes, "choices.0.delta.content", filtered); err == nil {
+								payloadBytes = rewritten
+							}
+						}
+					}
+					if v := gjson.GetBytes(payloadBytes, "choices.0.delta.reasoning_content"); v.Exists() && v.String() != "" {
+						if filtered := reasoningFilter.Write(v.String()); filtered != v.String() {
+							if rewritten, err := sjson.SetBytes(payloadBytes, "choices.0.delta.reasoning_content", filtered); err == nil {
+								payloadBytes = rewritten
+							}
+						}
+					}
+				}
+
+				line = "data: " + string(payloadBytes)
 			}
 		}
 
@@ -339,6 +369,23 @@ func (s *OpenAIGatewayService) streamRawChatCompletions(
 		}
 		if !clientDisconnected && clientOutputStarted {
 			c.Writer.Flush()
+		}
+	}
+
+	// Flush any residual buffered content from Qwen XML filters.
+	if qwenFilterEnabled {
+		flushedContent := contentFilter.Flush()
+		flushedReasoning := reasoningFilter.Flush()
+		if flushedContent != "" || flushedReasoning != "" {
+			flushBytes := []byte(`{"id":"chatcmpl-flush","object":"chat.completion.chunk","choices":[{"index":0,"delta":{},"finish_reason":null}]}`)
+			flushBytes, _ = sjson.SetBytes(flushBytes, "model", originalModel)
+			if flushedReasoning != "" {
+				flushBytes, _ = sjson.SetBytes(flushBytes, "choices.0.delta.reasoning_content", flushedReasoning)
+			}
+			if flushedContent != "" {
+				flushBytes, _ = sjson.SetBytes(flushBytes, "choices.0.delta.content", flushedContent)
+			}
+			writeLine("data: " + string(flushBytes))
 		}
 	}
 
@@ -453,6 +500,30 @@ func (s *OpenAIGatewayService) bufferRawChatCompletions(
 	if originalModel != upstreamModel {
 		if rewritten, err := sjson.SetBytes(respBody, "model", originalModel); err == nil {
 			respBody = rewritten
+		}
+	}
+
+	// Strip leaked Qwen XML tags from content/reasoning_content (non-streaming).
+	if strings.HasPrefix(strings.ToLower(upstreamModel), "qwen") {
+		choices := gjson.GetBytes(respBody, "choices")
+		if choices.IsArray() {
+			for i := range choices.Array() {
+				prefix := fmt.Sprintf("choices.%d.message.", i)
+				if v := gjson.GetBytes(respBody, prefix+"content"); v.Exists() && v.String() != "" {
+					if stripped := apicompat.StripQwenXMLToolCallTags(v.String()); stripped != v.String() {
+						if rewritten, err := sjson.SetBytes(respBody, prefix+"content", stripped); err == nil {
+							respBody = rewritten
+						}
+					}
+				}
+				if v := gjson.GetBytes(respBody, prefix+"reasoning_content"); v.Exists() && v.String() != "" {
+					if stripped := apicompat.StripQwenXMLToolCallTags(v.String()); stripped != v.String() {
+						if rewritten, err := sjson.SetBytes(respBody, prefix+"reasoning_content", stripped); err == nil {
+							respBody = rewritten
+						}
+					}
+				}
+			}
 		}
 	}
 

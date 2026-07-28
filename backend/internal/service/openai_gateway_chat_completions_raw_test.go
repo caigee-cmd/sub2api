@@ -644,6 +644,151 @@ func TestBufferRawChatCompletions_RejectsOversizedResponse(t *testing.T) {
 	require.Equal(t, http.StatusBadGateway, rec.Code)
 }
 
+func TestForwardAsRawChatCompletions_StripsQwenThinkingTagsStreaming(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	body := []byte(`{"model":"glm-5.2","messages":[{"role":"user","content":"hello"}],"stream":true}`)
+	rec := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(rec)
+	c.Request = httptest.NewRequest(http.MethodPost, "/v1/chat/completions", bytes.NewReader(body))
+	c.Request.Header.Set("Content-Type", "application/json")
+
+	upstreamBody := strings.Join([]string{
+		`data: {"id":"chatcmpl_qwen","object":"chat.completion.chunk","model":"qwen3.8-max-preview","choices":[{"index":0,"delta":{"role":"assistant"},"finish_reason":null}]}`,
+		"",
+		`data: {"id":"chatcmpl_qwen","object":"chat.completion.chunk","model":"qwen3.8-max-preview","choices":[{"index":0,"delta":{"reasoning_content":"<analysis>思考过程</analysis>"},"finish_reason":null}]}`,
+		"",
+		`data: {"id":"chatcmpl_qwen","object":"chat.completion.chunk","model":"qwen3.8-max-preview","choices":[{"index":0,"delta":{"reasoning_content":"<summary>总结</summary>"},"finish_reason":null}]}`,
+		"",
+		`data: {"id":"chatcmpl_qwen","object":"chat.completion.chunk","model":"qwen3.8-max-preview","choices":[{"index":0,"delta":{"content":"final answer"},"finish_reason":null}]}`,
+		"",
+		`data: {"id":"chatcmpl_qwen","object":"chat.completion.chunk","model":"qwen3.8-max-preview","choices":[],"usage":{"prompt_tokens":3,"completion_tokens":10,"total_tokens":13}}`,
+		"",
+		"data: [DONE]",
+		"",
+	}, "\n")
+	upstream := &httpUpstreamRecorder{resp: &http.Response{
+		StatusCode: http.StatusOK,
+		Header:     http.Header{"Content-Type": []string{"text/event-stream"}, "x-request-id": []string{"rid_qwen_strip_stream"}},
+		Body:       io.NopCloser(strings.NewReader(upstreamBody)),
+	}}
+
+	svc := &OpenAIGatewayService{
+		cfg:          rawChatCompletionsTestConfig(),
+		httpUpstream: upstream,
+	}
+	account := rawChatCompletionsTestAccount()
+	// Override credentials to use qwen model mapping
+	account.Credentials["model_mapping"] = map[string]any{"glm-5.2": "qwen3.8-max-preview"}
+
+	result, err := svc.forwardAsRawChatCompletions(context.Background(), c, account, body, "")
+	require.NoError(t, err)
+	require.NotNil(t, result)
+
+	out := rec.Body.String()
+	// Thinking tags must be stripped
+	require.NotContains(t, out, "<analysis>")
+	require.NotContains(t, out, "</analysis>")
+	require.NotContains(t, out, "<summary>")
+	require.NotContains(t, out, "</summary>")
+	// reasoning_content field still present (content between tags remains)
+	require.Contains(t, out, "reasoning_content")
+	// content unaffected
+	require.Contains(t, out, `"content":"final answer"`)
+	// usage extracted
+	require.Equal(t, 3, result.Usage.InputTokens)
+	require.Equal(t, 10, result.Usage.OutputTokens)
+	// model rewritten back to client-facing
+	require.Contains(t, out, `"model":"glm-5.2"`)
+	require.Contains(t, out, "data: [DONE]")
+}
+
+func TestForwardAsRawChatCompletions_StripsQwenThinkingTagsNonStreaming(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	body := []byte(`{"model":"glm-5.2","messages":[{"role":"user","content":"hello"}],"stream":false}`)
+	rec := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(rec)
+	c.Request = httptest.NewRequest(http.MethodPost, "/v1/chat/completions", bytes.NewReader(body))
+	c.Request.Header.Set("Content-Type", "application/json")
+
+	upstreamJSON := `{"id":"chatcmpl_qwen_ns","object":"chat.completion","model":"qwen3.8-max-preview","choices":[{"index":0,"message":{"role":"assistant","content":"final answer","reasoning_content":"<analysis>深度思考</analysis>中间推理<summary>结论</summary>"},"finish_reason":"stop"}],"usage":{"prompt_tokens":3,"completion_tokens":12,"total_tokens":15}}`
+	upstream := &httpUpstreamRecorder{resp: &http.Response{
+		StatusCode: http.StatusOK,
+		Header:     http.Header{"Content-Type": []string{"application/json"}, "x-request-id": []string{"rid_qwen_strip_ns"}},
+		Body:       io.NopCloser(strings.NewReader(upstreamJSON)),
+	}}
+
+	svc := &OpenAIGatewayService{
+		cfg:          rawChatCompletionsTestConfig(),
+		httpUpstream: upstream,
+	}
+	account := rawChatCompletionsTestAccount()
+	account.Credentials["model_mapping"] = map[string]any{"glm-5.2": "qwen3.8-max-preview"}
+
+	result, err := svc.forwardAsRawChatCompletions(context.Background(), c, account, body, "")
+	require.NoError(t, err)
+	require.NotNil(t, result)
+
+	out := rec.Body.String()
+	require.NotContains(t, out, "<analysis>")
+	require.NotContains(t, out, "</analysis>")
+	require.NotContains(t, out, "<summary>")
+	require.NotContains(t, out, "</summary>")
+	// reasoning_content field still present
+	require.True(t, gjson.Get(out, "choices.0.message.reasoning_content").Exists())
+	// content untouched
+	require.Equal(t, "final answer", gjson.Get(out, "choices.0.message.content").String())
+	// usage
+	require.Equal(t, 3, result.Usage.InputTokens)
+	require.Equal(t, 12, result.Usage.OutputTokens)
+	// model rewritten
+	require.Equal(t, "glm-5.2", gjson.Get(out, "model").String())
+}
+
+func TestForwardAsRawChatCompletions_PassthroughForNonQwenModels(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	body := []byte(`{"model":"deepseek-reasoner","messages":[{"role":"user","content":"hello"}],"stream":true}`)
+	rec := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(rec)
+	c.Request = httptest.NewRequest(http.MethodPost, "/v1/chat/completions", bytes.NewReader(body))
+	c.Request.Header.Set("Content-Type", "application/json")
+
+	upstreamBody := strings.Join([]string{
+		`data: {"id":"chatcmpl_ds","object":"chat.completion.chunk","model":"deepseek-reasoner","choices":[{"index":0,"delta":{"reasoning_content":"<analysis>should not strip</analysis>"},"finish_reason":null}]}`,
+		"",
+		`data: {"id":"chatcmpl_ds","object":"chat.completion.chunk","model":"deepseek-reasoner","choices":[{"index":0,"delta":{"content":"answer"},"finish_reason":null}]}`,
+		"",
+		`data: {"id":"chatcmpl_ds","object":"chat.completion.chunk","model":"deepseek-reasoner","choices":[],"usage":{"prompt_tokens":2,"completion_tokens":4,"total_tokens":6}}`,
+		"",
+		"data: [DONE]",
+		"",
+	}, "\n")
+	upstream := &httpUpstreamRecorder{resp: &http.Response{
+		StatusCode: http.StatusOK,
+		Header:     http.Header{"Content-Type": []string{"text/event-stream"}, "x-request-id": []string{"rid_ds_passthrough"}},
+		Body:       io.NopCloser(strings.NewReader(upstreamBody)),
+	}}
+
+	svc := &OpenAIGatewayService{
+		cfg:          rawChatCompletionsTestConfig(),
+		httpUpstream: upstream,
+	}
+	account := rawChatCompletionsTestAccount()
+
+	result, err := svc.forwardAsRawChatCompletions(context.Background(), c, account, body, "")
+	require.NoError(t, err)
+	require.NotNil(t, result)
+
+	out := rec.Body.String()
+	// Non-Qwen model: filter must NOT strip anything
+	require.Contains(t, out, "<analysis>should not strip</analysis>")
+	require.Contains(t, out, `"content":"answer"`)
+	require.Equal(t, 2, result.Usage.InputTokens)
+	require.Equal(t, 4, result.Usage.OutputTokens)
+}
+
 func rawChatCompletionsTestConfig() *config.Config {
 	return &config.Config{
 		Security: config.SecurityConfig{

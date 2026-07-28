@@ -5,30 +5,42 @@ import (
 	"strings"
 )
 
-// Qwen XML tool-call leak filter.
+// Qwen XML leak filter.
 //
 // Qwen models trained with XML chat-template tool-calling sometimes leak
 // internal markup into text output (e.g. tool_response, invoke, parameter
 // tags and their closing variants). This happens primarily under tool-heavy
 // prompts when thinking_budget truncates reasoning mid-tool-selection.
 //
-// This filter strips those leaked tags from response text. It is applied
+// Additionally, client system prompts sometimes instruct the model to wrap
+// thinking in XML tags (analysis, summary, think, thinking, thought,
+// reflection, reasoning). When enable_thinking=true forces reasoning into
+// reasoning_content, those tags leak into the client's reasoning fold as
+// visible XML markup.
+//
+// This filter strips all such leaked tags from response text. It is applied
 // only to Qwen upstream models and is a no-op for all other providers.
 
-// qwenXMLToolCallPattern matches complete XML tool-call tags:
+// qwenXMLTagNames enumerates all tag names this filter strips: tool-call
+// tags plus thinking/reasoning tags triggered by client prompts.
+var qwenXMLTagNames = `tool_response|invoke|parameter|tool_call|function_call|antml:invoke|antml:parameter|analysis|summary|think|thinking|thought|reflection|reasoning`
+
+// qwenXMLToolCallPattern matches complete XML tags (tool-call + thinking):
 // opening tags (with optional attributes), closing tags, and self-closing tags.
 var qwenXMLToolCallPattern = regexp.MustCompile(
-	`</?(?:tool_response|invoke|parameter|tool_call|function_call|antml:invoke|antml:parameter)(?:\s[^>]*)?>`,
+	`</?(?:` + qwenXMLTagNames + `)(?:\s[^>]*)?/?>`,
 )
 
 // qwenXMLToolCallPrefixPattern matches a trailing partial tag that might be
 // completed in the next streaming chunk.
 var qwenXMLToolCallPrefixPattern = regexp.MustCompile(
-	`<[/]?(?:tool_response|invoke|parameter|tool_call|function_call|antml:invoke|antml:parameter)?[^>]*$`,
+	`<[/]?(?:` + qwenXMLTagNames + `)?[^>]*$`,
 )
 
-// StripQwenXMLToolCallTags removes leaked XML tool-call tags from text.
+// StripQwenXMLToolCallTags removes all leaked Qwen XML tags from text —
+// both tool-call tags and thinking/reasoning tags (see qwenXMLTagNames).
 // Used for non-streaming responses where the full text is available.
+// Name retained for backward compatibility with existing callers.
 func StripQwenXMLToolCallTags(text string) string {
 	if !strings.Contains(text, "<") {
 		return text
