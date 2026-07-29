@@ -138,10 +138,12 @@ func (lb *DefaultLoadBalancer) queryEnabledInstances(
 	var matched []*dbent.PaymentProviderInstance
 	expectedWxpayJSAPIAppID := wxpayJSAPIAppIDFromContext(ctx)
 	for _, inst := range instances {
-		// Stripe: match by provider_key because supported_types lists sub-types (card,link,alipay,wxpay),
-		// not "stripe" itself. The checkout page aggregates all sub-types under "stripe".
+		// Stripe instances that support card/link are matched when the user
+		// selects the "stripe" (card) payment method. Stripe instances that
+		// only support wxpay/alipay are excluded here — they are matched via
+		// InstanceSupportsType when the user selects those methods instead.
 		if paymentType == TypeStripe {
-			if inst.ProviderKey == TypeStripe {
+			if inst.ProviderKey == TypeStripe && instanceSupportsCardOrLink(inst.SupportedTypes) {
 				matched = append(matched, inst)
 			}
 		} else if InstanceSupportsType(inst.SupportedTypes, paymentType) {
@@ -384,6 +386,22 @@ func InstanceSupportsType(supportedTypes string, target PaymentType) bool {
 	for _, t := range strings.Split(supportedTypes, ",") {
 		supported := strings.TrimSpace(t)
 		if supported == target || normalizeVisibleMethodSupportType(supported) == normalizedTarget {
+			return true
+		}
+	}
+	return false
+}
+
+// instanceSupportsCardOrLink reports whether a Stripe instance's
+// supported_types include card or link (the sub-types that serve the
+// user-facing "stripe" card payment method).
+func instanceSupportsCardOrLink(supportedTypes string) bool {
+	if strings.TrimSpace(supportedTypes) == "" {
+		return true // empty = all types
+	}
+	for _, t := range strings.Split(supportedTypes, ",") {
+		switch strings.TrimSpace(t) {
+		case TypeCard, TypeLink:
 			return true
 		}
 	}

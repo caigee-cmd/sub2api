@@ -48,6 +48,16 @@ func enabledVisibleMethodsForProvider(providerKey, supportedTypes string) []stri
 		for _, supportedType := range splitTypes(supportedTypes) {
 			addMethod(supportedType)
 		}
+	case payment.TypeStripe:
+		// Stripe instances can serve wxpay/alipay as sub-types alongside
+		// card/link. Surface those as visible methods so multi-currency
+		// Stripe setups (e.g. CNY wxpay + USD card) work correctly.
+		for _, supportedType := range splitTypes(supportedTypes) {
+			normalized := NormalizeVisibleMethod(supportedType)
+			if normalized == payment.TypeWxpay || normalized == payment.TypeAlipay {
+				addMethod(normalized)
+			}
+		}
 	}
 
 	methods := make([]string, 0, len(methodSet))
