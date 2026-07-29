@@ -214,8 +214,11 @@ func (s *PaymentConfigService) pcInstanceEasyPayCustomMethodDisplayName(inst *db
 }
 
 // pcGroupByPaymentType groups instances by user-facing payment type.
-// For Stripe providers, ALL sub-types (card, link, alipay, wxpay) map to "stripe"
-// because the user sees a single "Stripe" button, not individual sub-methods.
+// Stripe instances that support card/link are grouped under "stripe" (the
+// user-facing card button). Stripe instances that support wxpay or alipay
+// are grouped under those respective keys so they appear as separate
+// payment methods with their own currency. This enables multi-currency
+// Stripe setups (e.g. USD card + CNY wxpay on the same Stripe account).
 // Uses a seen set to avoid counting one instance twice.
 func pcGroupByPaymentType(instances []*dbent.PaymentProviderInstance) map[string][]*dbent.PaymentProviderInstance {
 	typeInstances := make(map[string][]*dbent.PaymentProviderInstance)
@@ -230,9 +233,19 @@ func pcGroupByPaymentType(instances []*dbent.PaymentProviderInstance) map[string
 		}
 	}
 	for _, inst := range instances {
-		// Stripe provider: all sub-types → single "stripe" group
 		if inst.ProviderKey == payment.TypeStripe {
-			add(payment.TypeStripe, inst)
+			// Card/link sub-types → "stripe" group (the card payment button).
+			if stripeInstanceSupportsCard(inst.SupportedTypes) {
+				add(payment.TypeStripe, inst)
+			}
+			// Non-card sub-types (wxpay, alipay) → their own visible method
+			// groups so they get independent currency and limits.
+			for _, t := range splitTypes(inst.SupportedTypes) {
+				normalized := NormalizeVisibleMethod(t)
+				if normalized != "" && normalized != payment.TypeStripe {
+					add(normalized, inst)
+				}
+			}
 			continue
 		}
 		for _, t := range splitTypes(inst.SupportedTypes) {
@@ -240,6 +253,22 @@ func pcGroupByPaymentType(instances []*dbent.PaymentProviderInstance) map[string
 		}
 	}
 	return typeInstances
+}
+
+// stripeInstanceSupportsCard reports whether a Stripe instance's
+// supported_types include card or link (the sub-types that map to the
+// user-facing "stripe" card payment method).
+func stripeInstanceSupportsCard(supportedTypes string) bool {
+	if strings.TrimSpace(supportedTypes) == "" {
+		return true // empty = all types
+	}
+	for _, t := range splitTypes(supportedTypes) {
+		switch strings.TrimSpace(t) {
+		case payment.TypeCard, payment.TypeLink:
+			return true
+		}
+	}
+	return false
 }
 
 // pcInstanceTypeLimits extracts per-type limits from a provider instance.
