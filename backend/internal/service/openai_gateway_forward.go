@@ -492,6 +492,41 @@ func (s *OpenAIGatewayService) Forward(ctx context.Context, c *gin.Context, acco
 			requestView = newOpenAIRequestView(body)
 		}
 	}
+
+	// Per-upstream parameter adaptation for native /v1/responses path.
+	// These mirror the transforms already applied in the chat-completions fallback
+	// paths (openai_gateway_chat_completions_raw.go, openai_gateway_responses_chat_fallback.go).
+	// Without this, glm-5.2 → qwen model_mapping sends string reasoning_effort
+	// ("low"/"high") to DashScope MaaS, which expects a boolean under
+	// parameters.chat_template_kwargs.reasoning_effort and returns 400.
+	upstreamAdapted := false
+	if normalizedBody, normalized := NormalizeGLMOpenAIReasoningEffort(body, upstreamModel); normalized {
+		body = normalizedBody
+		upstreamAdapted = true
+	}
+	if thinkingBody, injected := EnsureQwenEnableThinking(body, upstreamModel); injected {
+		body = thinkingBody
+		upstreamAdapted = true
+	}
+	if strippedBody, stripped := StripQwenReasoningEffort(body, upstreamModel, account.GetOpenAIBaseURL()); stripped {
+		body = strippedBody
+		upstreamAdapted = true
+	}
+	if strippedBody, stripped := StripKimiReasoning(body, upstreamModel, originalModel); stripped {
+		body = strippedBody
+		upstreamAdapted = true
+	}
+	if imgBody, imgStripped := StripImageInputAsText(body, originalModel, account); imgStripped {
+		body = imgBody
+		upstreamAdapted = true
+	}
+	if upstreamAdapted {
+		requestView = newOpenAIRequestView(body)
+		// Invalidate any cached reqBody map so subsequent ensureReqBody() calls
+		// re-decode from the adapted body instead of returning pre-adapt data.
+		reqBody = nil
+	}
+
 	imageBillingModel := ""
 	imageSizeTier := ""
 	imageInputSize := ""

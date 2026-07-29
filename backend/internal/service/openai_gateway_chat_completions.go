@@ -246,6 +246,27 @@ func (s *OpenAIGatewayService) ForwardAsChatCompletions(
 	}
 	responsesBody = updatedBody
 
+	// Per-upstream parameter adaptation for Chat Completions → /v1/responses path.
+	// Mirrors transforms applied in the raw chat-completions and responses fallback
+	// paths. Without this, glm-5.2 → qwen model_mapping sends string reasoning_effort
+	// ("low"/"high") to DashScope MaaS, which expects a boolean under
+	// parameters.chat_template_kwargs.reasoning_effort and returns 400.
+	if normalizedBody, normalized := NormalizeGLMOpenAIReasoningEffort(responsesBody, upstreamModel); normalized {
+		responsesBody = normalizedBody
+	}
+	if thinkingBody, injected := EnsureQwenEnableThinking(responsesBody, upstreamModel); injected {
+		responsesBody = thinkingBody
+	}
+	if strippedBody, stripped := StripQwenReasoningEffort(responsesBody, upstreamModel, account.GetOpenAIBaseURL()); stripped {
+		responsesBody = strippedBody
+	}
+	if strippedBody, stripped := StripKimiReasoning(responsesBody, upstreamModel, originalModel); stripped {
+		responsesBody = strippedBody
+	}
+	if imgBody, imgStripped := StripImageInputAsText(responsesBody, originalModel, account); imgStripped {
+		responsesBody = imgBody
+	}
+
 	// 5. Get access token
 	token, _, err := s.GetAccessToken(ctx, account)
 	if err != nil {

@@ -257,9 +257,16 @@ func (s *OpenAIGatewayService) ForwardAsAnthropic(
 		return nil, policyErr
 	}
 	responsesBody = updatedBody
+	// DashScope upstreams reject string reasoning_effort (expects boolean); strip it.
+	if strippedBody, stripped := StripQwenReasoningEffort(responsesBody, upstreamModel, account.GetOpenAIBaseURL()); stripped {
+		responsesBody = strippedBody
+	}
 	// Kimi upstreams reject the reasoning param; strip it before sending.
 	if strippedBody, stripped := StripKimiReasoning(responsesBody, upstreamModel, originalModel); stripped {
 		responsesBody = strippedBody
+	}
+	if imgBody, imgStripped := StripImageInputAsText(responsesBody, originalModel, account); imgStripped {
+		responsesBody = imgBody
 	}
 	grokCacheIdentity := ""
 	if account.Platform == PlatformGrok {

@@ -1415,17 +1415,33 @@ func EnsureQwenEnableThinking(body []byte, upstreamModel string) ([]byte, bool) 
 	return modified, changed
 }
 
-// StripQwenReasoningEffort removes the reasoning_effort / reasoning.effort
-// fields from the request body for Qwen models.
-//
-// Alibaba Cloud MaaS expects parameters.chat_template_kwargs.reasoning_effort
-// to be a boolean; OpenAI-compatible clients send string enums ("high",
-// "medium", "low") which trigger a 400 "Input should be a valid boolean".
-// Since EnsureQwenEnableThinking already forces enable_thinking=true, the
-// reasoning_effort field is meaningless for this upstream — strip it.
-func StripQwenReasoningEffort(body []byte, upstreamModel string) ([]byte, bool) {
+// isDashScopeUpstream reports whether the upstream is Alibaba Cloud MaaS
+// (DashScope). It checks the base URL first (most reliable), then falls back
+// to model prefix matching for accounts that rely on the default endpoint.
+func isDashScopeUpstream(upstreamModel, upstreamBaseURL string) bool {
+	url := strings.ToLower(strings.TrimSpace(upstreamBaseURL))
+	if strings.Contains(url, "dashscope") || strings.Contains(url, "aliyuncs.com") {
+		return true
+	}
 	id := strings.ToLower(strings.TrimSpace(upstreamModel))
-	if !strings.HasPrefix(id, "qwen") {
+	return strings.HasPrefix(id, "qwen")
+}
+
+// StripQwenReasoningEffort removes the reasoning_effort / reasoning.effort
+// fields from the request body when the upstream is Alibaba Cloud MaaS
+// (DashScope).
+//
+// DashScope expects parameters.chat_template_kwargs.reasoning_effort to be a
+// boolean; OpenAI-compatible clients send string enums ("high", "medium",
+// "low") which trigger a 400 "Input should be a valid boolean". Since
+// EnsureQwenEnableThinking already forces enable_thinking=true, the
+// reasoning_effort field is meaningless for this upstream — strip it.
+//
+// Detection: upstream base URL containing "dashscope" or "aliyuncs.com"
+// (covers all DashScope-hosted models regardless of name), with qwen model
+// prefix as a fallback for accounts without an explicit base_url.
+func StripQwenReasoningEffort(body []byte, upstreamModel, upstreamBaseURL string) ([]byte, bool) {
+	if !isDashScopeUpstream(upstreamModel, upstreamBaseURL) {
 		return body, false
 	}
 	changed := false
@@ -1514,6 +1530,77 @@ func InjectIdentitySystemPrompt(body []byte, originalModel string, account *Acco
 		return body, false
 	}
 	return modified, true
+}
+
+const imageStrippedPlaceholder = "[Image removed: this model does not support vision input. Briefly inform the user their image was not processed and suggest describing it in text instead.]"
+
+// StripImageInputAsText replaces image content parts with a text placeholder
+// for models that do not support vision input. The set of affected models is
+// configured per-account via extra "strip_image_input_models": ["glm-5.2"].
+//
+// Handles both Chat Completions format (messages[].content[].type="image_url")
+// and Responses format (input[].content[].type="input_image").
+func StripImageInputAsText(body []byte, originalModel string, account *Account) ([]byte, bool) {
+	models := account.GetStripImageInputModels()
+	if models == nil || !models[originalModel] {
+		return body, false
+	}
+
+	changed := false
+
+	// Chat Completions format: messages[].content[] where type == "image_url"
+	messages := gjson.GetBytes(body, "messages")
+	if messages.Exists() && messages.IsArray() {
+		msgIdx := 0
+		messages.ForEach(func(_, msg gjson.Result) bool {
+			contentArr := msg.Get("content")
+			if contentArr.Exists() && contentArr.IsArray() {
+				partIdx := 0
+				contentArr.ForEach(func(_, part gjson.Result) bool {
+					if part.Get("type").String() == "image_url" {
+						path := fmt.Sprintf("messages.%d.content.%d", msgIdx, partIdx)
+						replacement := `{"type":"text","text":"` + imageStrippedPlaceholder + `"}`
+						if newBody, err := sjson.SetRawBytes(body, path, []byte(replacement)); err == nil {
+							body = newBody
+							changed = true
+						}
+					}
+					partIdx++
+					return true
+				})
+			}
+			msgIdx++
+			return true
+		})
+	}
+
+	// Responses format: input[].content[] where type == "input_image"
+	inputArr := gjson.GetBytes(body, "input")
+	if inputArr.Exists() && inputArr.IsArray() {
+		itemIdx := 0
+		inputArr.ForEach(func(_, item gjson.Result) bool {
+			contentArr := item.Get("content")
+			if contentArr.Exists() && contentArr.IsArray() {
+				partIdx := 0
+				contentArr.ForEach(func(_, part gjson.Result) bool {
+					if part.Get("type").String() == "input_image" {
+						path := fmt.Sprintf("input.%d.content.%d", itemIdx, partIdx)
+						replacement := `{"type":"input_text","text":"` + imageStrippedPlaceholder + `"}`
+						if newBody, err := sjson.SetRawBytes(body, path, []byte(replacement)); err == nil {
+							body = newBody
+							changed = true
+						}
+					}
+					partIdx++
+					return true
+				})
+			}
+			itemIdx++
+			return true
+		})
+	}
+
+	return body, changed
 }
 
 func normalizeGLMOpenAIReasoningEffort(raw string) string {

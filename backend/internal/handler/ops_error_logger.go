@@ -888,7 +888,7 @@ func OpsErrorLoggerMiddleware(ops *service.OpsService) gin.HandlerFunc {
 				}(),
 				Stream:           stream,
 				InboundEndpoint:  GetInboundEndpoint(c),
-				UpstreamEndpoint: GetUpstreamEndpoint(c, platform),
+				UpstreamEndpoint: resolveOpsUpstreamEndpoint(c, platform),
 				RequestedModel:   modelName,
 				UpstreamModel: func() string {
 					if v, ok := c.Get(opsUpstreamModelKey); ok {
@@ -1031,7 +1031,7 @@ func OpsErrorLoggerMiddleware(ops *service.OpsService) gin.HandlerFunc {
 			}(),
 			Stream:           stream,
 			InboundEndpoint:  GetInboundEndpoint(c),
-			UpstreamEndpoint: GetUpstreamEndpoint(c, platform),
+			UpstreamEndpoint: resolveOpsUpstreamEndpoint(c, platform),
 			RequestedModel:   modelName,
 			UpstreamModel: func() string {
 				if v, ok := c.Get(opsUpstreamModelKey); ok {
@@ -1183,7 +1183,7 @@ func logOpsStreamError(c *gin.Context, ops *service.OpsService, wireStatus int) 
 		// 就地 SSE 错误只出现在流式请求上。
 		Stream:           true,
 		InboundEndpoint:  GetInboundEndpoint(c),
-		UpstreamEndpoint: GetUpstreamEndpoint(c, platform),
+		UpstreamEndpoint: resolveOpsUpstreamEndpoint(c, platform),
 		RequestedModel:   modelName,
 		UpstreamModel: func() string {
 			if v, ok := c.Get(opsUpstreamModelKey); ok {
@@ -1812,4 +1812,14 @@ func shouldSkipOpsErrorLog(ctx context.Context, ops *service.OpsService, message
 // 统一落一条 status=403 的错误请求，故中间件跳过自身落库，避免双写。
 func shouldSkipOpsErrorLogForCyber(c *gin.Context) bool {
 	return service.GetOpsCyberPolicy(c) != nil
+}
+
+// resolveOpsUpstreamEndpoint prefers the actual endpoint recorded by the
+// forwarding attempt (e.g. "/v1/chat/completions" for force-CC accounts),
+// falling back to derivation from inbound path + platform.
+func resolveOpsUpstreamEndpoint(c *gin.Context, platform string) string {
+	if endpoint := service.GetActualOpenAIUpstreamEndpoint(c); endpoint != "" {
+		return endpoint
+	}
+	return GetUpstreamEndpoint(c, platform)
 }

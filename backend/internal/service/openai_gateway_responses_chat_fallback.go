@@ -83,11 +83,14 @@ func (s *OpenAIGatewayService) forwardResponsesViaRawChatCompletions(
 	if thinkingBody, injected := EnsureQwenEnableThinking(chatBody, upstreamModel); injected {
 		chatBody = thinkingBody
 	}
-	if strippedBody, stripped := StripQwenReasoningEffort(chatBody, upstreamModel); stripped {
+	if strippedBody, stripped := StripQwenReasoningEffort(chatBody, upstreamModel, account.GetOpenAIBaseURL()); stripped {
 		chatBody = strippedBody
 	}
 	if strippedBody, stripped := StripKimiReasoning(chatBody, upstreamModel, originalModel); stripped {
 		chatBody = strippedBody
+	}
+	if imgBody, imgStripped := StripImageInputAsText(chatBody, originalModel, account); imgStripped {
+		chatBody = imgBody
 	}
 	if identityBody, injected := InjectIdentitySystemPrompt(chatBody, originalModel, account); injected {
 		chatBody = identityBody

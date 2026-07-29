@@ -102,6 +102,30 @@ func (s *OpenAIGatewayService) forwardOpenAIPassthrough(
 	}
 	body = updatedBody
 
+	// Per-upstream parameter adaptation for passthrough /v1/responses path.
+	// Mirrors transforms in forward/chat-completions paths. When compact mode
+	// remaps the model to a qwen slug, string reasoning_effort from OpenAI-
+	// compatible clients would otherwise reach DashScope MaaS which expects bool.
+	upstreamPassthroughModelFinal := strings.TrimSpace(gjson.GetBytes(body, "model").String())
+	if upstreamPassthroughModelFinal == "" {
+		upstreamPassthroughModelFinal = reqModel
+	}
+	if normalizedBody, normalized := NormalizeGLMOpenAIReasoningEffort(body, upstreamPassthroughModelFinal); normalized {
+		body = normalizedBody
+	}
+	if thinkingBody, injected := EnsureQwenEnableThinking(body, upstreamPassthroughModelFinal); injected {
+		body = thinkingBody
+	}
+	if strippedBody, stripped := StripQwenReasoningEffort(body, upstreamPassthroughModelFinal, account.GetOpenAIBaseURL()); stripped {
+		body = strippedBody
+	}
+	if strippedBody, stripped := StripKimiReasoning(body, upstreamPassthroughModelFinal, reqModel); stripped {
+		body = strippedBody
+	}
+	if imgBody, imgStripped := StripImageInputAsText(body, reqModel, account); imgStripped {
+		body = imgBody
+	}
+
 	apiKey := getAPIKeyFromContext(c)
 	// 同一 attempt 的最终 model/body 只判定一次，权限检查与后续图片状态设置共用该结果。
 	imageIntent := resolveOpenAIPassthroughImageIntent(

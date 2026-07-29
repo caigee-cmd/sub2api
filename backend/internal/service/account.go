@@ -939,6 +939,36 @@ func (a *Account) GetIdentitySystemPrompts() map[string]string {
 	return stringMappingFromRaw(a.Extra["identity_system_prompts"])
 }
 
+// GetStripImageInputModels returns the list of client-facing model names for
+// which image input should be stripped (replaced with a text placeholder).
+// Configured via account extra "strip_image_input_models": ["glm-5.2", ...].
+func (a *Account) GetStripImageInputModels() map[string]bool {
+	if a.Extra == nil {
+		return nil
+	}
+	raw, ok := a.Extra["strip_image_input_models"]
+	if !ok {
+		return nil
+	}
+	arr, ok := raw.([]any)
+	if !ok || len(arr) == 0 {
+		return nil
+	}
+	set := make(map[string]bool, len(arr))
+	for _, v := range arr {
+		if s, ok := v.(string); ok {
+			s = strings.TrimSpace(s)
+			if s != "" {
+				set[s] = true
+			}
+		}
+	}
+	if len(set) == 0 {
+		return nil
+	}
+	return set
+}
+
 func (a *Account) GetClaudeUserID() string {
 	if v := strings.TrimSpace(a.GetExtraString("claude_user_id")); v != "" {
 		return v
