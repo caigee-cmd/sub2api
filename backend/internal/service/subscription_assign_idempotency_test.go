@@ -324,7 +324,7 @@ func TestAssignSubscriptionDoesNotReactivateFutureSuspendedSubscription(t *testi
 		Notes:     "assignment",
 	})
 
-	svc := NewSubscriptionService(groupRepo, subRepo, nil, nil, nil)
+	svc := NewSubscriptionService(groupRepo, subRepo, nil, nil, nil, nil)
 	sub, err := svc.AssignSubscription(context.Background(), &AssignSubscriptionInput{
 		UserID:       1003,
 		GroupID:      1,
@@ -365,7 +365,7 @@ func TestAssignSubscriptionDoesNotReactivatePastExpirySuspendedSubscription(t *t
 		Notes:              "suspended assignment",
 	})
 
-	svc := NewSubscriptionService(groupRepo, subRepo, nil, nil, nil)
+	svc := NewSubscriptionService(groupRepo, subRepo, nil, nil, nil, nil)
 	sub, err := svc.AssignSubscription(context.Background(), &AssignSubscriptionInput{
 		UserID:       1005,
 		GroupID:      1,
@@ -411,7 +411,7 @@ func TestAssignSubscriptionRenewsExpiredSemanticMatch(t *testing.T) {
 		Notes:              " assignment ",
 	})
 
-	svc := NewSubscriptionService(groupRepo, subRepo, nil, nil, nil)
+	svc := NewSubscriptionService(groupRepo, subRepo, nil, nil, nil, nil)
 	before := time.Now()
 	sub, err := svc.AssignSubscription(context.Background(), &AssignSubscriptionInput{
 		UserID:       1002,
@@ -453,7 +453,7 @@ func TestAssignSubscriptionRenewsExpiredAndAppendsDifferentNotes(t *testing.T) {
 		Notes:     "old assignment",
 	})
 
-	svc := NewSubscriptionService(groupRepo, subRepo, nil, nil, nil)
+	svc := NewSubscriptionService(groupRepo, subRepo, nil, nil, nil, nil)
 	sub, err := svc.AssignSubscription(context.Background(), &AssignSubscriptionInput{
 		UserID:       1004,
 		GroupID:      1,
@@ -558,7 +558,7 @@ func TestBulkAssignSubscriptionRenewsExpiredSemanticMatch(t *testing.T) {
 		Notes:           "bulk",
 	})
 
-	svc := NewSubscriptionService(groupRepo, subRepo, nil, nil, nil)
+	svc := NewSubscriptionService(groupRepo, subRepo, nil, nil, nil, nil)
 	before := time.Now()
 	result, err := svc.BulkAssignSubscription(context.Background(), &BulkAssignSubscriptionInput{
 		UserIDs:      []int64{4},

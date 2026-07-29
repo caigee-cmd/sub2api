@@ -80,7 +80,7 @@ func TestAssignOrExtendSubscription_ExpiredSubscriptionAppendsMatchingNotes(t *t
 		Status:    SubscriptionStatusExpired,
 		Notes:     "same",
 	})
-	svc := NewSubscriptionService(groupRepo, subRepo, nil, nil, nil)
+	svc := NewSubscriptionService(groupRepo, subRepo, nil, nil, nil, nil)
 
 	renewed, reused, err := svc.AssignOrExtendSubscription(context.Background(), &AssignSubscriptionInput{
 		UserID:       201,
