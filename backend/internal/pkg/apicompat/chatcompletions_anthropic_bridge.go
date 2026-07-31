@@ -289,6 +289,13 @@ func anthropicAssistantToChatMessages(raw json.RawMessage) ([]ChatMessage, error
 		})
 	}
 
+	// Some Chat Completions upstreams reject assistant messages whose JSON
+	// lacks a "content" key entirely (omitempty drops nil RawMessage).
+	// Emit explicit null, which the OpenAI spec permits for tool-call turns.
+	if msg.Content == nil {
+		msg.Content = json.RawMessage("null")
+	}
+
 	return []ChatMessage{msg}, nil
 }
 
