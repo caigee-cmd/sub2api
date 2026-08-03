@@ -23,6 +23,8 @@ const (
 	FieldStatus = "status"
 	// FieldLatencyMs holds the string denoting the latency_ms field in the database.
 	FieldLatencyMs = "latency_ms"
+	// FieldFirstTokenLatencyMs holds the string denoting the first_token_latency_ms field in the database.
+	FieldFirstTokenLatencyMs = "first_token_latency_ms"
 	// FieldPingLatencyMs holds the string denoting the ping_latency_ms field in the database.
 	FieldPingLatencyMs = "ping_latency_ms"
 	// FieldMessage holds the string denoting the message field in the database.
@@ -49,6 +51,7 @@ var Columns = []string{
 	FieldModel,
 	FieldStatus,
 	FieldLatencyMs,
+	FieldFirstTokenLatencyMs,
 	FieldPingLatencyMs,
 	FieldMessage,
 	FieldCheckedAt,
@@ -126,6 +129,11 @@ func ByStatus(opts ...sql.OrderTermOption) OrderOption {
 // ByLatencyMs orders the results by the latency_ms field.
 func ByLatencyMs(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldLatencyMs, opts...).ToFunc()
+}
+
+// ByFirstTokenLatencyMs orders the results by the first_token_latency_ms field.
+func ByFirstTokenLatencyMs(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldFirstTokenLatencyMs, opts...).ToFunc()
 }
 
 // ByPingLatencyMs orders the results by the ping_latency_ms field.

@@ -55,6 +55,20 @@ func (_c *ChannelMonitorHistoryCreate) SetNillableLatencyMs(v *int) *ChannelMoni
 	return _c
 }
 
+// SetFirstTokenLatencyMs sets the "first_token_latency_ms" field.
+func (_c *ChannelMonitorHistoryCreate) SetFirstTokenLatencyMs(v int) *ChannelMonitorHistoryCreate {
+	_c.mutation.SetFirstTokenLatencyMs(v)
+	return _c
+}
+
+// SetNillableFirstTokenLatencyMs sets the "first_token_latency_ms" field if the given value is not nil.
+func (_c *ChannelMonitorHistoryCreate) SetNillableFirstTokenLatencyMs(v *int) *ChannelMonitorHistoryCreate {
+	if v != nil {
+		_c.SetFirstTokenLatencyMs(*v)
+	}
+	return _c
+}
+
 // SetPingLatencyMs sets the "ping_latency_ms" field.
 func (_c *ChannelMonitorHistoryCreate) SetPingLatencyMs(v int) *ChannelMonitorHistoryCreate {
 	_c.mutation.SetPingLatencyMs(v)
@@ -218,6 +232,10 @@ func (_c *ChannelMonitorHistoryCreate) createSpec() (*ChannelMonitorHistory, *sq
 		_spec.SetField(channelmonitorhistory.FieldLatencyMs, field.TypeInt, value)
 		_node.LatencyMs = &value
 	}
+	if value, ok := _c.mutation.FirstTokenLatencyMs(); ok {
+		_spec.SetField(channelmonitorhistory.FieldFirstTokenLatencyMs, field.TypeInt, value)
+		_node.FirstTokenLatencyMs = &value
+	}
 	if value, ok := _c.mutation.PingLatencyMs(); ok {
 		_spec.SetField(channelmonitorhistory.FieldPingLatencyMs, field.TypeInt, value)
 		_node.PingLatencyMs = &value
@@ -356,6 +374,30 @@ func (u *ChannelMonitorHistoryUpsert) AddLatencyMs(v int) *ChannelMonitorHistory
 // ClearLatencyMs clears the value of the "latency_ms" field.
 func (u *ChannelMonitorHistoryUpsert) ClearLatencyMs() *ChannelMonitorHistoryUpsert {
 	u.SetNull(channelmonitorhistory.FieldLatencyMs)
+	return u
+}
+
+// SetFirstTokenLatencyMs sets the "first_token_latency_ms" field.
+func (u *ChannelMonitorHistoryUpsert) SetFirstTokenLatencyMs(v int) *ChannelMonitorHistoryUpsert {
+	u.Set(channelmonitorhistory.FieldFirstTokenLatencyMs, v)
+	return u
+}
+
+// UpdateFirstTokenLatencyMs sets the "first_token_latency_ms" field to the value that was provided on create.
+func (u *ChannelMonitorHistoryUpsert) UpdateFirstTokenLatencyMs() *ChannelMonitorHistoryUpsert {
+	u.SetExcluded(channelmonitorhistory.FieldFirstTokenLatencyMs)
+	return u
+}
+
+// AddFirstTokenLatencyMs adds v to the "first_token_latency_ms" field.
+func (u *ChannelMonitorHistoryUpsert) AddFirstTokenLatencyMs(v int) *ChannelMonitorHistoryUpsert {
+	u.Add(channelmonitorhistory.FieldFirstTokenLatencyMs, v)
+	return u
+}
+
+// ClearFirstTokenLatencyMs clears the value of the "first_token_latency_ms" field.
+func (u *ChannelMonitorHistoryUpsert) ClearFirstTokenLatencyMs() *ChannelMonitorHistoryUpsert {
+	u.SetNull(channelmonitorhistory.FieldFirstTokenLatencyMs)
 	return u
 }
 
@@ -520,6 +562,34 @@ func (u *ChannelMonitorHistoryUpsertOne) UpdateLatencyMs() *ChannelMonitorHistor
 func (u *ChannelMonitorHistoryUpsertOne) ClearLatencyMs() *ChannelMonitorHistoryUpsertOne {
 	return u.Update(func(s *ChannelMonitorHistoryUpsert) {
 		s.ClearLatencyMs()
+	})
+}
+
+// SetFirstTokenLatencyMs sets the "first_token_latency_ms" field.
+func (u *ChannelMonitorHistoryUpsertOne) SetFirstTokenLatencyMs(v int) *ChannelMonitorHistoryUpsertOne {
+	return u.Update(func(s *ChannelMonitorHistoryUpsert) {
+		s.SetFirstTokenLatencyMs(v)
+	})
+}
+
+// AddFirstTokenLatencyMs adds v to the "first_token_latency_ms" field.
+func (u *ChannelMonitorHistoryUpsertOne) AddFirstTokenLatencyMs(v int) *ChannelMonitorHistoryUpsertOne {
+	return u.Update(func(s *ChannelMonitorHistoryUpsert) {
+		s.AddFirstTokenLatencyMs(v)
+	})
+}
+
+// UpdateFirstTokenLatencyMs sets the "first_token_latency_ms" field to the value that was provided on create.
+func (u *ChannelMonitorHistoryUpsertOne) UpdateFirstTokenLatencyMs() *ChannelMonitorHistoryUpsertOne {
+	return u.Update(func(s *ChannelMonitorHistoryUpsert) {
+		s.UpdateFirstTokenLatencyMs()
+	})
+}
+
+// ClearFirstTokenLatencyMs clears the value of the "first_token_latency_ms" field.
+func (u *ChannelMonitorHistoryUpsertOne) ClearFirstTokenLatencyMs() *ChannelMonitorHistoryUpsertOne {
+	return u.Update(func(s *ChannelMonitorHistoryUpsert) {
+		s.ClearFirstTokenLatencyMs()
 	})
 }
 
@@ -857,6 +927,34 @@ func (u *ChannelMonitorHistoryUpsertBulk) UpdateLatencyMs() *ChannelMonitorHisto
 func (u *ChannelMonitorHistoryUpsertBulk) ClearLatencyMs() *ChannelMonitorHistoryUpsertBulk {
 	return u.Update(func(s *ChannelMonitorHistoryUpsert) {
 		s.ClearLatencyMs()
+	})
+}
+
+// SetFirstTokenLatencyMs sets the "first_token_latency_ms" field.
+func (u *ChannelMonitorHistoryUpsertBulk) SetFirstTokenLatencyMs(v int) *ChannelMonitorHistoryUpsertBulk {
+	return u.Update(func(s *ChannelMonitorHistoryUpsert) {
+		s.SetFirstTokenLatencyMs(v)
+	})
+}
+
+// AddFirstTokenLatencyMs adds v to the "first_token_latency_ms" field.
+func (u *ChannelMonitorHistoryUpsertBulk) AddFirstTokenLatencyMs(v int) *ChannelMonitorHistoryUpsertBulk {
+	return u.Update(func(s *ChannelMonitorHistoryUpsert) {
+		s.AddFirstTokenLatencyMs(v)
+	})
+}
+
+// UpdateFirstTokenLatencyMs sets the "first_token_latency_ms" field to the value that was provided on create.
+func (u *ChannelMonitorHistoryUpsertBulk) UpdateFirstTokenLatencyMs() *ChannelMonitorHistoryUpsertBulk {
+	return u.Update(func(s *ChannelMonitorHistoryUpsert) {
+		s.UpdateFirstTokenLatencyMs()
+	})
+}
+
+// ClearFirstTokenLatencyMs clears the value of the "first_token_latency_ms" field.
+func (u *ChannelMonitorHistoryUpsertBulk) ClearFirstTokenLatencyMs() *ChannelMonitorHistoryUpsertBulk {
+	return u.Update(func(s *ChannelMonitorHistoryUpsert) {
+		s.ClearFirstTokenLatencyMs()
 	})
 }
 
