@@ -26,6 +26,8 @@ type ChannelMonitorHistory struct {
 	Status channelmonitorhistory.Status `json:"status,omitempty"`
 	// LatencyMs holds the value of the "latency_ms" field.
 	LatencyMs *int `json:"latency_ms,omitempty"`
+	// FirstTokenLatencyMs holds the value of the "first_token_latency_ms" field.
+	FirstTokenLatencyMs *int `json:"first_token_latency_ms,omitempty"`
 	// PingLatencyMs holds the value of the "ping_latency_ms" field.
 	PingLatencyMs *int `json:"ping_latency_ms,omitempty"`
 	// Message holds the value of the "message" field.
@@ -63,7 +65,7 @@ func (*ChannelMonitorHistory) scanValues(columns []string) ([]any, error) {
 	values := make([]any, len(columns))
 	for i := range columns {
 		switch columns[i] {
-		case channelmonitorhistory.FieldID, channelmonitorhistory.FieldMonitorID, channelmonitorhistory.FieldLatencyMs, channelmonitorhistory.FieldPingLatencyMs:
+		case channelmonitorhistory.FieldID, channelmonitorhistory.FieldMonitorID, channelmonitorhistory.FieldLatencyMs, channelmonitorhistory.FieldFirstTokenLatencyMs, channelmonitorhistory.FieldPingLatencyMs:
 			values[i] = new(sql.NullInt64)
 		case channelmonitorhistory.FieldModel, channelmonitorhistory.FieldStatus, channelmonitorhistory.FieldMessage:
 			values[i] = new(sql.NullString)
@@ -114,6 +116,13 @@ func (_m *ChannelMonitorHistory) assignValues(columns []string, values []any) er
 			} else if value.Valid {
 				_m.LatencyMs = new(int)
 				*_m.LatencyMs = int(value.Int64)
+			}
+		case channelmonitorhistory.FieldFirstTokenLatencyMs:
+			if value, ok := values[i].(*sql.NullInt64); !ok {
+				return fmt.Errorf("unexpected type %T for field first_token_latency_ms", values[i])
+			} else if value.Valid {
+				_m.FirstTokenLatencyMs = new(int)
+				*_m.FirstTokenLatencyMs = int(value.Int64)
 			}
 		case channelmonitorhistory.FieldPingLatencyMs:
 			if value, ok := values[i].(*sql.NullInt64); !ok {
@@ -186,6 +195,11 @@ func (_m *ChannelMonitorHistory) String() string {
 	builder.WriteString(", ")
 	if v := _m.LatencyMs; v != nil {
 		builder.WriteString("latency_ms=")
+		builder.WriteString(fmt.Sprintf("%v", *v))
+	}
+	builder.WriteString(", ")
+	if v := _m.FirstTokenLatencyMs; v != nil {
+		builder.WriteString("first_token_latency_ms=")
 		builder.WriteString(fmt.Sprintf("%v", *v))
 	}
 	builder.WriteString(", ")

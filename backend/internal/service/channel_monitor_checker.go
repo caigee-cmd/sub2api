@@ -1,6 +1,7 @@
 package service
 
 import (
+	"bufio"
 	"bytes"
 	"context"
 	"encoding/json"
@@ -67,10 +68,11 @@ func runCheckForModel(ctx context.Context, provider, endpoint, apiKey, model str
 	mode := bodyOverrideMode(opts)
 
 	start := time.Now()
-	respText, rawBody, statusCode, err := callProvider(ctx, provider, endpoint, apiKey, model, challenge.Prompt, opts)
+	respText, rawBody, firstTokenMs, statusCode, err := callProvider(ctx, provider, endpoint, apiKey, model, challenge.Prompt, opts, start)
 	latency := time.Since(start)
 	latencyMs := int(latency / time.Millisecond)
 	res.LatencyMs = &latencyMs
+	res.FirstTokenMs = firstTokenMs
 
 	if err != nil {
 		res.Status = MonitorStatusError
@@ -154,6 +156,7 @@ func pingEndpointOrigin(ctx context.Context, endpoint string) *int {
 //   - 序列化请求体
 //   - 构造鉴权头
 //   - 从响应 JSON 中提取文本（默认按 gjson path；需要时可自定义）
+//   - 从单个 SSE data 载荷中提取增量文本（流式探测用）
 //
 // 加新 provider 只需要在 providerAdapters 里增加一个条目，无需触碰 callProvider / validateProvider。
 type providerAdapter struct {
@@ -162,6 +165,9 @@ type providerAdapter struct {
 	buildHeaders func(apiKey string) map[string]string
 	textPath     string // gjson 提取响应文本的 path
 	extractText  func([]byte) string
+	// streamText 从一个 SSE data 载荷里抽取增量文本；无文本返回空串。
+	// 首个非空增量到达的时刻即首 token 时间（TTFT）。
+	streamText func([]byte) string
 }
 
 // providerAdapters 全部已支持的 provider。键值即 MonitorProvider* 字符串。
@@ -177,6 +183,7 @@ var providerAdapters = map[string]providerAdapter{
 				"model":      model,
 				"messages":   []map[string]string{{"role": "user", "content": prompt}},
 				"max_tokens": monitorChallengeMaxTokens,
+				"stream":     true,
 			})
 		},
 		buildHeaders: func(apiKey string) map[string]string {
@@ -186,10 +193,12 @@ var providerAdapters = map[string]providerAdapter{
 			}
 		},
 		extractText: extractAnthropicMonitorText,
+		streamText:  streamAnthropicDelta,
 	},
 	MonitorProviderGemini: {
-		// Gemini 把 model 名写在 URL path 上：/v1beta/models/{model}:generateContent
-		buildPath: func(model string) string { return fmt.Sprintf(providerGeminiPathTemplate, model) },
+		// Gemini 把 model 名写在 URL path 上：/v1beta/models/{model}:streamGenerateContent?alt=sse
+		// （非流式 generateContent 仅在上游忽略 stream 语义时走 textPath 回退）。
+		buildPath: func(model string) string { return fmt.Sprintf(providerGeminiStreamPathTemplate, model) },
 		buildBody: func(_, prompt string) ([]byte, error) {
 			return json.Marshal(map[string]any{
 				"contents": []map[string]any{
@@ -202,7 +211,8 @@ var providerAdapters = map[string]providerAdapter{
 		buildHeaders: func(apiKey string) map[string]string {
 			return map[string]string{"x-goog-api-key": apiKey}
 		},
-		textPath: "candidates.0.content.parts.0.text",
+		textPath:   "candidates.0.content.parts.0.text",
+		streamText: streamGeminiDelta,
 	},
 }
 
@@ -220,13 +230,14 @@ func newOpenAICompatibleChatAdapter(path string) providerAdapter {
 				"model":      model,
 				"messages":   []map[string]string{{"role": "user", "content": prompt}},
 				"max_tokens": monitorChallengeMaxTokens,
-				"stream":     false,
+				"stream":     true,
 			})
 		},
 		buildHeaders: func(apiKey string) map[string]string {
 			return map[string]string{"Authorization": "Bearer " + apiKey}
 		},
-		textPath: "choices.0.message.content",
+		textPath:   "choices.0.message.content",
+		streamText: streamOpenAIChatDelta,
 	}
 }
 
@@ -239,13 +250,16 @@ var providerOpenAIResponsesAdapter = providerAdapter{
 			"instructions":      "You are a channel health-check endpoint. Answer the arithmetic challenge exactly and briefly.",
 			"input":             prompt,
 			"max_output_tokens": monitorChallengeMaxTokens,
-			"stream":            false,
+			"stream":            true,
 		})
 	},
 	buildHeaders: func(apiKey string) map[string]string {
 		return map[string]string{"Authorization": "Bearer " + apiKey}
 	},
 	textPath: "output.0.content.0.text",
+	// 非流式回退时 output 数组顺序由模型决定，用聚合函数兜底而非裸 textPath。
+	extractText: extractOpenAIResponsesText,
+	streamText:  streamOpenAIResponsesDelta,
 }
 
 // providerAdapterFor 按 provider + api_mode 选择具体 adapter。
@@ -266,35 +280,30 @@ func isSupportedProvider(p string) bool {
 
 // callProvider 通过 providerAdapters 分发到具体实现。
 // opts 承载用户的自定义 headers / body 覆盖（可为 nil）。
+// start 是本次检测的起始时刻，流式响应里用它度量首 token 耗时（TTFT）。
 //
 // 返回值：
 //   - extractedText: 按 textPath 抽出的成功文本，仅在 status 2xx 时有意义；非 2xx 时通常为空串
 //   - rawBody: 完整响应体的字符串形式（已被 monitorResponseMaxBytes 截断），用于错误路径保留上游真实回包
+//   - firstTokenMs: 流式探测首个文本增量到达的耗时；上游未按流式回包时为 nil
 //   - status: HTTP 状态码
 //   - err: 网络 / 序列化错误
-func callProvider(ctx context.Context, provider, endpoint, apiKey, model, prompt string, opts *CheckOptions) (extractedText, rawBody string, status int, err error) {
+func callProvider(ctx context.Context, provider, endpoint, apiKey, model, prompt string, opts *CheckOptions, start time.Time) (extractedText, rawBody string, firstTokenMs *int, status int, err error) {
 	requestedAPIMode := checkAPIMode(opts)
 	if err := validateAPIMode(provider, requestedAPIMode); err != nil {
-		return "", "", 0, err
+		return "", "", nil, 0, err
 	}
 	adapter, apiMode, ok := providerAdapterFor(provider, requestedAPIMode)
 	if !ok {
-		return "", "", 0, fmt.Errorf("unsupported provider %q", provider)
+		return "", "", nil, 0, fmt.Errorf("unsupported provider %q", provider)
 	}
 	body, err := buildRequestBody(adapter, provider, apiMode, model, prompt, opts)
 	if err != nil {
-		return "", "", 0, err
+		return "", "", nil, 0, err
 	}
 	headers := mergeHeaders(adapter.buildHeaders(apiKey), opts)
 	full := joinURL(endpoint, adapter.buildPath(model))
-	respBytes, status, err := postRawJSON(ctx, full, body, headers)
-	if err != nil {
-		return "", "", status, err
-	}
-	if provider == MonitorProviderOpenAI && apiMode == MonitorAPIModeResponses {
-		return extractOpenAIResponsesText(respBytes), string(respBytes), status, nil
-	}
-	return extractMonitorResponseText(adapter, respBytes), string(respBytes), status, nil
+	return postProviderRequest(ctx, full, body, headers, adapter, start)
 }
 
 func extractMonitorResponseText(adapter providerAdapter, respBytes []byte) string {
@@ -363,7 +372,8 @@ func extractOpenAIResponsesText(respBytes []byte) string {
 	if len(texts) > 0 {
 		return strings.Join(texts, "")
 	}
-	return gjson.GetBytes(respBytes, providerOpenAIResponsesAdapter.textPath).String()
+	// 与 providerOpenAIResponsesAdapter.textPath 保持一致；内联避免包级变量初始化环。
+	return gjson.GetBytes(respBytes, "output.0.content.0.text").String()
 }
 
 // mergeHeaders 把用户自定义 headers 合并到 adapter 默认 headers 上。
@@ -392,7 +402,7 @@ func mergeHeaders(base map[string]string, opts *CheckOptions) map[string]string 
 //     bodyMergeKeyDenyList[provider] 的 key 会被静默丢弃，避免破坏 challenge / model 路由
 //   - replace: 直接 marshal BodyOverride 作为完整 body
 //
-// 任何 mode 返回的 []byte 都已经是合法 JSON，可直接送入 postRawJSON。
+// 任何 mode 返回的 []byte 都已经是合法 JSON，可直接送入 postProviderRequest。
 func buildRequestBody(adapter providerAdapter, provider, apiMode, model, prompt string, opts *CheckOptions) ([]byte, error) {
 	mode := bodyOverrideMode(opts)
 
@@ -502,30 +512,123 @@ func hasNonEmptyBodyValue(v any) bool {
 	}
 }
 
-// postRawJSON 发送 POST + 已序列化好的 JSON 字节，限制响应体大小，返回响应字节、HTTP status、错误。
-// adapter 自行 marshal 是为了精确控制字段顺序与类型，所以这里直接收 []byte 而不是 any。
-func postRawJSON(ctx context.Context, fullURL string, payload []byte, headers map[string]string) ([]byte, int, error) {
+// postProviderRequest 发送探测请求并按响应类型分流：
+//   - SSE（text/event-stream）：逐行累积增量文本，记录首 token 耗时；
+//   - 普通 JSON：整体解析（上游忽略 stream 参数时的回退路径），firstTokenMs 为 nil。
+//
+// 响应体总读取量受 monitorResponseMaxBytes 限制，防止 OOM。
+func postProviderRequest(ctx context.Context, fullURL string, payload []byte, headers map[string]string, adapter providerAdapter, start time.Time) (extractedText, rawBody string, firstTokenMs *int, status int, err error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, fullURL, bytes.NewReader(payload))
 	if err != nil {
-		return nil, 0, fmt.Errorf("build request: %w", err)
+		return "", "", nil, 0, fmt.Errorf("build request: %w", err)
 	}
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Accept", "application/json")
+	req.Header.Set("Accept", "application/json, text/event-stream")
 	for k, v := range headers {
 		req.Header.Set(k, v)
 	}
 
 	resp, err := monitorHTTPClient.Do(req)
 	if err != nil {
-		return nil, 0, fmt.Errorf("do request: %w", err)
+		return "", "", nil, 0, fmt.Errorf("do request: %w", err)
 	}
 	defer func() { _ = resp.Body.Close() }()
 
+	// 仅 2xx 走 SSE 解析；非 2xx 时回退普通读取以保留上游错误体（rawBody）供诊断。
+	if resp.StatusCode >= 200 && resp.StatusCode < 300 && strings.Contains(resp.Header.Get("Content-Type"), "text/event-stream") {
+		text, ttft, readErr := readEventStream(resp.Body, adapter, start)
+		return text, "", ttft, resp.StatusCode, readErr
+	}
+
 	respBody, err := io.ReadAll(io.LimitReader(resp.Body, monitorResponseMaxBytes))
 	if err != nil {
-		return nil, resp.StatusCode, fmt.Errorf("read body: %w", err)
+		return "", "", nil, resp.StatusCode, fmt.Errorf("read body: %w", err)
 	}
-	return respBody, resp.StatusCode, nil
+	return extractMonitorResponseText(adapter, respBody), string(respBody), nil, resp.StatusCode, nil
+}
+
+// readEventStream 消费 SSE 响应，按 adapter.streamText 累积增量文本。
+// TTFT = 首个非空文本增量到达时刻 - start。
+func readEventStream(body io.Reader, adapter providerAdapter, start time.Time) (text string, firstTokenMs *int, err error) {
+	scanner := bufio.NewScanner(io.LimitReader(body, monitorResponseMaxBytes))
+	scanner.Buffer(make([]byte, 0, monitorStreamReadChunkBytes), monitorStreamLineMaxBytes)
+
+	var parts []string
+	var firstTokenAt time.Time
+	for scanner.Scan() {
+		data, ok := extractSSEDataLine(scanner.Text())
+		if !ok || adapter.streamText == nil {
+			continue
+		}
+		delta := adapter.streamText([]byte(data))
+		if delta == "" {
+			continue
+		}
+		if firstTokenAt.IsZero() {
+			firstTokenAt = time.Now()
+		}
+		parts = append(parts, delta)
+	}
+	if err := scanner.Err(); err != nil {
+		return "", nil, fmt.Errorf("read stream: %w", err)
+	}
+	if !firstTokenAt.IsZero() {
+		ms := int(firstTokenAt.Sub(start) / time.Millisecond)
+		firstTokenMs = &ms
+	}
+	return strings.Join(parts, ""), firstTokenMs, nil
+}
+
+// extractSSEDataLine 取 "data:" 行的载荷；空载荷与 [DONE] 返回 false。
+func extractSSEDataLine(line string) (string, bool) {
+	if !strings.HasPrefix(line, "data:") {
+		return "", false
+	}
+	data := strings.TrimSpace(strings.TrimPrefix(line, "data:"))
+	if data == "" || data == "[DONE]" {
+		return "", false
+	}
+	return data, true
+}
+
+// streamOpenAIChatDelta 从 OpenAI/Grok chat completions SSE data 中抽取增量文本。
+func streamOpenAIChatDelta(data []byte) string {
+	return gjson.GetBytes(data, "choices.0.delta.content").String()
+}
+
+// streamOpenAIResponsesDelta 从 Responses API 的 output_text delta 事件抽取文本。
+func streamOpenAIResponsesDelta(data []byte) string {
+	if gjson.GetBytes(data, "type").String() != "response.output_text.delta" {
+		return ""
+	}
+	return gjson.GetBytes(data, "delta").String()
+}
+
+// streamAnthropicDelta 从 Anthropic Messages 的 content_block_delta 事件抽取文本。
+func streamAnthropicDelta(data []byte) string {
+	if gjson.GetBytes(data, "type").String() != "content_block_delta" {
+		return ""
+	}
+	if gjson.GetBytes(data, "delta.type").String() != "text_delta" {
+		return ""
+	}
+	return gjson.GetBytes(data, "delta.text").String()
+}
+
+// streamGeminiDelta 从 Gemini streamGenerateContent 的 SSE data 中抽取文本。
+func streamGeminiDelta(data []byte) string {
+	parts := gjson.GetBytes(data, "candidates.0.content.parts")
+	if !parts.IsArray() {
+		return ""
+	}
+	var texts []string
+	parts.ForEach(func(_, part gjson.Result) bool {
+		if t := part.Get("text").String(); t != "" {
+			texts = append(texts, t)
+		}
+		return true
+	})
+	return strings.Join(texts, "")
 }
 
 // joinURL 把 base origin 与 path 拼成完整 URL。

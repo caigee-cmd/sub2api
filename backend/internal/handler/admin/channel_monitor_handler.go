@@ -94,6 +94,7 @@ type channelMonitorResponse struct {
 	UpdatedAt           string                               `json:"updated_at"`
 	PrimaryStatus       string                               `json:"primary_status"`
 	PrimaryLatencyMs    *int                                 `json:"primary_latency_ms"`
+	PrimaryFirstTokenMs *int                                 `json:"primary_first_token_ms"`
 	Availability7d      float64                              `json:"availability_7d"`
 	ExtraModelsStatus   []dto.ChannelMonitorExtraModelStatus `json:"extra_models_status"`
 	// 请求自定义快照：前端编辑 / 展示「高级设置」用
@@ -107,6 +108,7 @@ type channelMonitorCheckResultResponse struct {
 	Model         string `json:"model"`
 	Status        string `json:"status"`
 	LatencyMs     *int   `json:"latency_ms"`
+	FirstTokenMs  *int   `json:"first_token_ms"`
 	PingLatencyMs *int   `json:"ping_latency_ms"`
 	Message       string `json:"message"`
 	CheckedAt     string `json:"checked_at"`
@@ -117,6 +119,7 @@ type channelMonitorHistoryItemResponse struct {
 	Model         string `json:"model"`
 	Status        string `json:"status"`
 	LatencyMs     *int   `json:"latency_ms"`
+	FirstTokenMs  *int   `json:"first_token_ms"`
 	PingLatencyMs *int   `json:"ping_latency_ms"`
 	Message       string `json:"message"`
 	CheckedAt     string `json:"checked_at"`
@@ -177,6 +180,7 @@ func checkResultToResponse(r *service.CheckResult) channelMonitorCheckResultResp
 		Model:         r.Model,
 		Status:        r.Status,
 		LatencyMs:     r.LatencyMs,
+		FirstTokenMs:  r.FirstTokenMs,
 		PingLatencyMs: r.PingLatencyMs,
 		Message:       r.Message,
 		CheckedAt:     r.CheckedAt.UTC().Format(time.RFC3339),
@@ -189,6 +193,7 @@ func historyEntryToResponse(e *service.ChannelMonitorHistoryEntry) channelMonito
 		Model:         e.Model,
 		Status:        e.Status,
 		LatencyMs:     e.LatencyMs,
+		FirstTokenMs:  e.FirstTokenMs,
 		PingLatencyMs: e.PingLatencyMs,
 		Message:       e.Message,
 		CheckedAt:     e.CheckedAt.UTC().Format(time.RFC3339),
@@ -269,13 +274,15 @@ func buildListItemResponse(m *service.ChannelMonitor, summary service.MonitorSta
 	resp := channelMonitorToResponse(m)
 	resp.PrimaryStatus = summary.PrimaryStatus
 	resp.PrimaryLatencyMs = summary.PrimaryLatencyMs
+	resp.PrimaryFirstTokenMs = summary.PrimaryFirstTokenMs
 	resp.Availability7d = summary.Availability7d
 	resp.ExtraModelsStatus = make([]dto.ChannelMonitorExtraModelStatus, 0, len(summary.ExtraModels))
 	for _, e := range summary.ExtraModels {
 		resp.ExtraModelsStatus = append(resp.ExtraModelsStatus, dto.ChannelMonitorExtraModelStatus{
-			Model:     e.Model,
-			Status:    e.Status,
-			LatencyMs: e.LatencyMs,
+			Model:        e.Model,
+			Status:       e.Status,
+			LatencyMs:    e.LatencyMs,
+			FirstTokenMs: e.FirstTokenMs,
 		})
 	}
 	return resp

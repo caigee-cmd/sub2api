@@ -55,6 +55,8 @@ const (
 	providerAnthropicPath = "/v1/messages"
 	// providerGeminiPathTemplate Gemini generateContent 路径模板（含 model 占位）。
 	providerGeminiPathTemplate = "/v1beta/models/%s:generateContent"
+	// providerGeminiStreamPathTemplate Gemini 流式探测路径（SSE 格式回包）。
+	providerGeminiStreamPathTemplate = "/v1beta/models/%s:streamGenerateContent?alt=sse"
 
 	// MonitorProviderOpenAI / Anthropic / Gemini / Grok provider 字符串常量（也是 ent enum 的实际值）。
 	MonitorProviderOpenAI    = "openai"
@@ -93,6 +95,11 @@ const (
 	monitorAnthropicAPIVersion = "2023-06-01"
 	// monitorChallengeMaxTokens 单次 challenge 请求的 max_tokens（足够回答个位数算术）。
 	monitorChallengeMaxTokens = 50
+
+	// monitorStreamLineMaxBytes 流式探测单行（SSE data 行）最大字节数。
+	monitorStreamLineMaxBytes = 64 * 1024
+	// monitorStreamReadChunkBytes 流式探测单次读取块大小。
+	monitorStreamReadChunkBytes = 4096
 
 	// monitorRunOneBuffer runOne 的总超时缓冲（除请求超时与 ping 超时外的额外裕量）。
 	monitorRunOneBuffer = 10 * time.Second
