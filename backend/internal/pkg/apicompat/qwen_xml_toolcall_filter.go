@@ -68,7 +68,7 @@ func (f *QwenXMLStreamFilter) Write(delta string) string {
 		return delta
 	}
 
-	f.buf.WriteString(delta)
+	_, _ = f.buf.WriteString(delta)
 	s := f.buf.String()
 
 	// Strip complete XML tags.
@@ -81,7 +81,7 @@ func (f *QwenXMLStreamFilter) Write(delta string) string {
 		if strings.HasPrefix(tail, "<") {
 			safe := s[:loc[0]]
 			f.buf.Reset()
-			f.buf.WriteString(tail)
+			_, _ = f.buf.WriteString(tail)
 			return safe
 		}
 	}

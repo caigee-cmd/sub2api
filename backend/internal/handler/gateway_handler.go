@@ -1712,10 +1712,10 @@ func (h *GatewayHandler) mapUpstreamError(statusCode int) (int, string, string) 
 // This prevents leaking upstream infrastructure information regardless of
 // which passthrough rule or code path produced the message.
 var clientMessagePatterns = []*regexp.Regexp{
-	regexp.MustCompile(`(?i)https?://\S+`),                        // URLs
-	regexp.MustCompile(`(?i)request\s*id:\s*\S+`),                 // request IDs
-	regexp.MustCompile(`(?i)docs\.\w+\.\w+/\d+`),                  // doc links
-	regexp.MustCompile(`(?i)volcengine|dashscope|aliyuncs\.com`),  // provider names
+	regexp.MustCompile(`(?i)https?://\S+`),                       // URLs
+	regexp.MustCompile(`(?i)request\s*id:\s*\S+`),                // request IDs
+	regexp.MustCompile(`(?i)docs\.\w+\.\w+/\d+`),                 // doc links
+	regexp.MustCompile(`(?i)volcengine|dashscope|aliyuncs\.com`), // provider names
 }
 
 func sanitizeClientMessage(msg string) string {

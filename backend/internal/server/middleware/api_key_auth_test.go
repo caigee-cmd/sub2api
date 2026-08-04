@@ -1269,7 +1269,7 @@ func TestAPIKeyAuthBillingInfoSkipsBillingAndSideEffects(t *testing.T) {
 	}
 	cfg := &config.Config{RunMode: config.RunModeStandard}
 	apiKeyService := service.NewAPIKeyService(apiKeyRepo, nil, nil, nil, nil, nil, cfg)
-	subscriptionService := service.NewSubscriptionService(nil, subscriptionRepo, nil, nil, cfg)
+	subscriptionService := service.NewSubscriptionService(nil, subscriptionRepo, nil, nil, cfg, nil)
 	t.Cleanup(subscriptionService.Stop)
 	router := newAuthTestRouter(apiKeyService, subscriptionService, cfg)
 

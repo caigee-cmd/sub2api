@@ -265,21 +265,21 @@ func (h *PaymentHandler) CreateOrder(c *gin.Context) {
 		mobile = *req.IsMobile
 	}
 	result, err := h.paymentService.CreateOrder(c.Request.Context(), service.CreateOrderRequest{
-		UserID:                     subject.UserID,
-		Amount:                     req.Amount,
-		PaymentType:                req.PaymentType,
-		OpenID:                     req.OpenID,
-		ClientIP:                   c.ClientIP(),
-		IsMobile:                   mobile,
-		IsWeChatBrowser:            isWeChatBrowser(c),
-		SrcHost:                    c.Request.Host,
-		SrcURL:                     c.Request.Referer(),
-		ReturnURL:                  req.ReturnURL,
-		PaymentSource:              req.PaymentSource,
-		OrderType:                  req.OrderType,
-		PlanID:                     req.PlanID,
-		UpgradeFromSubscriptionID:  req.UpgradeFromSubscriptionID,
-		Locale:                     c.GetHeader("Accept-Language"),
+		UserID:                    subject.UserID,
+		Amount:                    req.Amount,
+		PaymentType:               req.PaymentType,
+		OpenID:                    req.OpenID,
+		ClientIP:                  c.ClientIP(),
+		IsMobile:                  mobile,
+		IsWeChatBrowser:           isWeChatBrowser(c),
+		SrcHost:                   c.Request.Host,
+		SrcURL:                    c.Request.Referer(),
+		ReturnURL:                 req.ReturnURL,
+		PaymentSource:             req.PaymentSource,
+		OrderType:                 req.OrderType,
+		PlanID:                    req.PlanID,
+		UpgradeFromSubscriptionID: req.UpgradeFromSubscriptionID,
+		Locale:                    c.GetHeader("Accept-Language"),
 	})
 	if err != nil {
 		response.ErrorFrom(c, err)
