@@ -159,17 +159,17 @@ func TestPcGroupByPaymentType(t *testing.T) {
 
 		groups := pcGroupByPaymentType([]*dbent.PaymentProviderInstance{stripe, easypay})
 
-		// Stripe instance should only be in "stripe" group
+		// Stripe instance should be in "stripe" group (card/link sub-types)
 		if len(groups[payment.TypeStripe]) != 1 || groups[payment.TypeStripe][0].ID != 1 {
 			t.Fatalf("stripe group should contain only stripe instance, got %v", groups[payment.TypeStripe])
 		}
-		// alipay group should only contain easypay, NOT stripe
-		if len(groups[payment.TypeAlipay]) != 1 || groups[payment.TypeAlipay][0].ID != 2 {
-			t.Fatalf("alipay group should contain only easypay instance, got %v", groups[payment.TypeAlipay])
+		// alipay group should contain both stripe (multi-currency split) and easypay
+		if len(groups[payment.TypeAlipay]) != 2 {
+			t.Fatalf("alipay group should contain stripe + easypay, got %v", groups[payment.TypeAlipay])
 		}
-		// wxpay group should only contain easypay, NOT stripe
-		if len(groups[payment.TypeWxpay]) != 1 || groups[payment.TypeWxpay][0].ID != 2 {
-			t.Fatalf("wxpay group should contain only easypay instance, got %v", groups[payment.TypeWxpay])
+		// wxpay group should contain both stripe (multi-currency split) and easypay
+		if len(groups[payment.TypeWxpay]) != 2 {
+			t.Fatalf("wxpay group should contain stripe + easypay, got %v", groups[payment.TypeWxpay])
 		}
 	})
 
