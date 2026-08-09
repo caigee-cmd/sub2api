@@ -425,17 +425,18 @@ func extractAnthropicTextFromBlocks(blocks []AnthropicContentBlock) string {
 // OpenAI Responses API effort levels.
 //
 // Both APIs default to "high". The mapping is 1:1 for shared levels;
-// Anthropic's "max" is clamped to "high" because most OpenAI-compatible
-// upstreams only accept {low, medium, high}. GPT-5.6 models that genuinely
-// support "max" are handled separately by normalizeOpenAIReasoningEffortForModel.
+// Anthropic's "max" maps to "xhigh" (OpenAI native). Non-OpenAI-compatible
+// upstreams that reject "xhigh" are handled per-group via MaxReasoningEffort
+// policy. GPT-5.6 models that genuinely support "max" are handled separately
+// by normalizeOpenAIReasoningEffortForModel.
 //
-//	low    → low
-//	medium → medium
-//	high   → high
-//	max    → high
+//	low    -> low
+//	medium -> medium
+//	high   -> high
+//	max    -> xhigh
 func mapAnthropicEffortToResponses(effort string) string {
 	if effort == "max" {
-		return "high"
+		return "xhigh"
 	}
 	return effort // low→low, medium→medium, high→high, unknown→passthrough
 }
