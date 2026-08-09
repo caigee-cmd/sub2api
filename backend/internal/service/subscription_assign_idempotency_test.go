@@ -9,6 +9,7 @@ import (
 	dbent "github.com/Wei-Shaw/sub2api/ent"
 	infraerrors "github.com/Wei-Shaw/sub2api/internal/pkg/errors"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/pagination"
+	"github.com/Wei-Shaw/sub2api/internal/pkg/timezone"
 	"github.com/dgraph-io/ristretto"
 	"github.com/stretchr/testify/require"
 )
@@ -111,6 +112,9 @@ func (userSubRepoNoop) Create(context.Context, *UserSubscription) error {
 func (userSubRepoNoop) GetByID(context.Context, int64) (*UserSubscription, error) {
 	panic("unexpected GetByID call")
 }
+func (userSubRepoNoop) GetByIDForUpdate(context.Context, int64) (*UserSubscription, error) {
+	panic("unexpected GetByIDForUpdate call")
+}
 func (userSubRepoNoop) GetByIDIncludeDeleted(context.Context, int64) (*UserSubscription, error) {
 	panic("unexpected GetByIDIncludeDeleted call")
 }
@@ -154,10 +158,10 @@ func (userSubRepoNoop) UpdateStatus(context.Context, int64, string) error {
 func (userSubRepoNoop) UpdateNotes(context.Context, int64, string) error {
 	panic("unexpected UpdateNotes call")
 }
-func (userSubRepoNoop) ActivateWindows(context.Context, int64, time.Time) error {
+func (userSubRepoNoop) ActivateWindows(context.Context, int64, time.Time, time.Time) error {
 	panic("unexpected ActivateWindows call")
 }
-func (userSubRepoNoop) ResetUsageWindows(context.Context, int64, bool, bool, bool, time.Time) error {
+func (userSubRepoNoop) ResetUsageWindows(context.Context, int64, bool, bool, bool, time.Time, time.Time) error {
 	panic("unexpected ResetUsageWindows call")
 }
 func (userSubRepoNoop) ResetDailyUsage(context.Context, int64, *time.Time, time.Time) error {
@@ -249,6 +253,10 @@ func (s *subscriptionUserSubRepoStub) GetByID(_ context.Context, id int64) (*Use
 	return &cp, nil
 }
 
+func (s *subscriptionUserSubRepoStub) GetByIDForUpdate(ctx context.Context, id int64) (*UserSubscription, error) {
+	return s.GetByID(ctx, id)
+}
+
 func (s *subscriptionUserSubRepoStub) Update(_ context.Context, sub *UserSubscription) error {
 	if sub == nil {
 		return ErrSubscriptionNilInput
@@ -324,7 +332,7 @@ func TestAssignSubscriptionDoesNotReactivateFutureSuspendedSubscription(t *testi
 		Notes:     "assignment",
 	})
 
-	svc := NewSubscriptionService(groupRepo, subRepo, nil, nil, nil)
+	svc := NewSubscriptionService(groupRepo, subRepo, nil, nil, nil, nil)
 	sub, err := svc.AssignSubscription(context.Background(), &AssignSubscriptionInput{
 		UserID:       1003,
 		GroupID:      1,
@@ -365,7 +373,7 @@ func TestAssignSubscriptionDoesNotReactivatePastExpirySuspendedSubscription(t *t
 		Notes:              "suspended assignment",
 	})
 
-	svc := NewSubscriptionService(groupRepo, subRepo, nil, nil, nil)
+	svc := NewSubscriptionService(groupRepo, subRepo, nil, nil, nil, nil)
 	sub, err := svc.AssignSubscription(context.Background(), &AssignSubscriptionInput{
 		UserID:       1005,
 		GroupID:      1,
@@ -411,7 +419,7 @@ func TestAssignSubscriptionRenewsExpiredSemanticMatch(t *testing.T) {
 		Notes:              " assignment ",
 	})
 
-	svc := NewSubscriptionService(groupRepo, subRepo, nil, nil, nil)
+	svc := NewSubscriptionService(groupRepo, subRepo, nil, nil, nil, nil)
 	before := time.Now()
 	sub, err := svc.AssignSubscription(context.Background(), &AssignSubscriptionInput{
 		UserID:       1002,
@@ -428,9 +436,9 @@ func TestAssignSubscriptionRenewsExpiredSemanticMatch(t *testing.T) {
 	require.False(t, sub.StartsAt.Before(before))
 	require.False(t, sub.StartsAt.After(after))
 	require.Equal(t, sub.StartsAt.AddDate(0, 0, 30), sub.ExpiresAt)
-	require.Equal(t, startOfDay(sub.StartsAt), *sub.DailyWindowStart)
-	require.Equal(t, startOfDay(sub.StartsAt), *sub.WeeklyWindowStart)
-	require.Equal(t, startOfDay(sub.StartsAt), *sub.MonthlyWindowStart)
+	require.Equal(t, timezone.StartOfDay(sub.StartsAt), *sub.DailyWindowStart, "续期后日窗口应锚定当天 0 点")
+	require.Equal(t, sub.StartsAt, *sub.WeeklyWindowStart)
+	require.Equal(t, sub.StartsAt, *sub.MonthlyWindowStart)
 	require.Zero(t, sub.DailyUsageUSD)
 	require.Zero(t, sub.WeeklyUsageUSD)
 	require.Zero(t, sub.MonthlyUsageUSD)
@@ -453,7 +461,7 @@ func TestAssignSubscriptionRenewsExpiredAndAppendsDifferentNotes(t *testing.T) {
 		Notes:     "old assignment",
 	})
 
-	svc := NewSubscriptionService(groupRepo, subRepo, nil, nil, nil)
+	svc := NewSubscriptionService(groupRepo, subRepo, nil, nil, nil, nil)
 	sub, err := svc.AssignSubscription(context.Background(), &AssignSubscriptionInput{
 		UserID:       1004,
 		GroupID:      1,
@@ -558,7 +566,7 @@ func TestBulkAssignSubscriptionRenewsExpiredSemanticMatch(t *testing.T) {
 		Notes:           "bulk",
 	})
 
-	svc := NewSubscriptionService(groupRepo, subRepo, nil, nil, nil)
+	svc := NewSubscriptionService(groupRepo, subRepo, nil, nil, nil, nil)
 	before := time.Now()
 	result, err := svc.BulkAssignSubscription(context.Background(), &BulkAssignSubscriptionInput{
 		UserIDs:      []int64{4},
