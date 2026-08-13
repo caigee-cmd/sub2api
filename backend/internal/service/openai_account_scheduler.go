@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/Wei-Shaw/sub2api/internal/config"
+	"github.com/Wei-Shaw/sub2api/internal/pkg/ctxkey"
 	"golang.org/x/sync/singleflight"
 )
 
@@ -84,6 +85,7 @@ type OpenAIAccountScheduleRequest struct {
 	RequiredImageCapability OpenAIImagesCapability
 	RequireCompact          bool
 	ExcludedIDs             map[int64]struct{}
+	EstimatedInputTokens    int
 }
 
 type OpenAIAccountScheduleDecision struct {
@@ -1704,6 +1706,11 @@ func (s *defaultOpenAIAccountScheduler) isAccountRequestCompatibleReason(ctx con
 	if req.RequestedModel != "" && !account.IsModelSupported(req.RequestedModel) {
 		return false, "model_not_supported"
 	}
+	// 上下文窗口过滤：账号配置了 max_context_window 且请求估算 token 数超过上限时排除。
+	// 未配置 max_context_window 的账号不受影响（0 = 不参与此过滤）。
+	if maxCtx := account.GetMaxContextWindow(); maxCtx > 0 && req.EstimatedInputTokens > maxCtx {
+		return false, "context_window_exceeded"
+	}
 	if req.GroupID != nil && s != nil && s.service != nil &&
 		s.service.needsUpstreamChannelRestrictionCheck(ctx, req.GroupID) &&
 		s.service.isUpstreamModelRestrictedByChannel(ctx, *req.GroupID, account, req.RequestedModel, req.RequireCompact) {
@@ -2203,7 +2210,21 @@ func (s *OpenAIGatewayService) selectAccountWithSchedulerOnce(
 		RequiredImageCapability: requiredImageCapability,
 		RequireCompact:          requireCompact,
 		ExcludedIDs:             excludedIDs,
+		EstimatedInputTokens:    estimatedInputTokensFromContext(ctx),
 	})
+}
+
+// estimatedInputTokensFromContext 从 context 中读取 handler 层粗估的输入 token 数。
+// 未设置时返回 0，表示不参与上下文窗口过滤。
+func estimatedInputTokensFromContext(ctx context.Context) int {
+	if ctx == nil {
+		return 0
+	}
+	v, ok := ctx.Value(ctxkey.EstimatedInputTokens).(int)
+	if !ok {
+		return 0
+	}
+	return v
 }
 
 func accountSupportsOpenAICapabilities(account *Account, requiredCapability OpenAIEndpointCapability, requiredImageCapability OpenAIImagesCapability) bool {

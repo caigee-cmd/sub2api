@@ -81,4 +81,8 @@ const (
 
 	// ClaudeCodeVersion stores the extracted Claude Code version from User-Agent (e.g. "2.1.22")
 	ClaudeCodeVersion Key = "ctx_claude_code_version"
+
+	// EstimatedInputTokens 是当前请求的估算输入 token 数。
+	// 由 handler 层根据请求体大小粗估，供调度器按账号 max_context_window 过滤。
+	EstimatedInputTokens Key = "ctx_estimated_input_tokens"
 )

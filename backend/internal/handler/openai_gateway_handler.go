@@ -20,6 +20,7 @@ import (
 	"github.com/Wei-Shaw/sub2api/internal/securityaudit"
 	middleware2 "github.com/Wei-Shaw/sub2api/internal/server/middleware"
 	"github.com/Wei-Shaw/sub2api/internal/service"
+	"github.com/Wei-Shaw/sub2api/internal/util/logredact"
 
 	coderws "github.com/coder/websocket"
 	"github.com/gin-gonic/gin"
@@ -421,6 +422,11 @@ func (h *OpenAIGatewayHandler) Responses(c *gin.Context) {
 		return
 	}
 	requireCompact := isOpenAIRemoteCompactPath(c)
+
+	// 粗估输入 token 数（body 字节数 / 4），供调度器按账号 max_context_window 过滤。
+	estimatedTokens := len(body) / 4
+	tokenCtx := context.WithValue(c.Request.Context(), ctxkey.EstimatedInputTokens, estimatedTokens)
+	c.Request = c.Request.WithContext(tokenCtx)
 
 	maxAccountSwitches := h.maxAccountSwitches
 	switchCount := 0
@@ -2613,6 +2619,7 @@ func (h *OpenAIGatewayHandler) handleStreamingAwareErrorWithCode(
 	streamStarted bool,
 	countTowardsSLA bool,
 ) {
+	message = logredact.RedactUpstreamURL(message)
 	// body-signal compact 心跳可能已把响应头提交为 200：先停心跳（建立
 	// happens-before，接管 ResponseWriter），并升级为流内错误处理。
 	if service.StopOpenAICompactSSEKeepaliveCommitted(c) {
@@ -2788,6 +2795,7 @@ func openAIFirstOutputFailoverExhausted(failoverErr *service.UpstreamFailoverErr
 
 // errorResponse returns OpenAI API format error response
 func (h *OpenAIGatewayHandler) errorResponse(c *gin.Context, status int, errType, message string) {
+	message = logredact.RedactUpstreamURL(message)
 	// body-signal compact 心跳可能已把响应头提交为 200：JSON 错误体会与已
 	// 提交的 SSE 流交错，必须降级为 response.failed 终止事件（#3887）。
 	if service.StopOpenAICompactSSEKeepaliveCommitted(c) {

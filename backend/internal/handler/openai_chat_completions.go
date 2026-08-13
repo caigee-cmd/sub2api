@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Wei-Shaw/sub2api/internal/pkg/ctxkey"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/ip"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/logger"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/openai_compat"
@@ -139,6 +140,11 @@ func (h *OpenAIGatewayHandler) ChatCompletions(c *gin.Context) {
 
 	sessionHash := h.gatewayService.GenerateSessionHash(c, body)
 	promptCacheKey := h.gatewayService.ExtractSessionID(c, body)
+
+	// 粗估输入 token 数（body 字节数 / 4），供调度器按账号 max_context_window 过滤。
+	estimatedTokens := len(body) / 4
+	tokenCtx := context.WithValue(c.Request.Context(), ctxkey.EstimatedInputTokens, estimatedTokens)
+	c.Request = c.Request.WithContext(tokenCtx)
 
 	maxAccountSwitches := h.maxAccountSwitches
 	switchCount := 0

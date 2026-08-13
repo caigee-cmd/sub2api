@@ -2249,6 +2249,13 @@ func (a *Account) getExtraInt(key string) int {
 	return 0
 }
 
+// GetMaxContextWindow 返回账号可处理的最大上下文 token 数。
+// 配置在 accounts.extra.max_context_window 中。
+// 返回 0 表示未配置，该账号不参与上下文大小过滤。
+func (a *Account) GetMaxContextWindow() int {
+	return a.getExtraInt("max_context_window")
+}
+
 // GetQuotaDailyResetMode 获取日额度重置模式："rolling"（默认）或 "fixed"
 func (a *Account) GetQuotaDailyResetMode() string {
 	if m := a.getExtraString("quota_daily_reset_mode"); m == "fixed" {
