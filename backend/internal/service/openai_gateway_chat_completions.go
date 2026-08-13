@@ -268,6 +268,10 @@ func (s *OpenAIGatewayService) ForwardAsChatCompletions(
 	if imgBody, imgStripped := StripImageInputAsText(responsesBody, originalModel, account); imgStripped {
 		responsesBody = imgBody
 	}
+	// Responses 路径也需要注入身份提示词（raw chat completions 路径已在 forwardAsRawChatCompletions 中注入）
+	if identityBody, injected := InjectIdentitySystemPromptForResponses(responsesBody, originalModel, account); injected {
+		responsesBody = identityBody
+	}
 
 	// 5. Get access token
 	token, _, err := s.GetAccessToken(ctx, account)

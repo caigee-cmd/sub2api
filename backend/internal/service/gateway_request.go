@@ -1532,6 +1532,46 @@ func InjectIdentitySystemPrompt(body []byte, originalModel string, account *Acco
 	return modified, true
 }
 
+// InjectIdentitySystemPromptForResponses prepends a per-model identity system message to
+// the Responses API instructions field. The prompt is looked up by the
+// client-facing model name (originalModel) in account extra
+// "identity_system_prompts". Used to make a mapped model present itself
+// under a different identity (e.g. glm-5.2 served by grok-4.5).
+//
+// The system message is prepended to the instructions field.
+// If the body has no instructions field or the model has no configured prompt,
+// the body is returned unchanged.
+func InjectIdentitySystemPromptForResponses(body []byte, originalModel string, account *Account) ([]byte, bool) {
+	prompts := account.GetIdentitySystemPrompts()
+	if prompts == nil {
+		return body, false
+	}
+	prompt, ok := prompts[originalModel]
+	if !ok || strings.TrimSpace(prompt) == "" {
+		return body, false
+	}
+
+	// Check if instructions field exists
+	instructionsResult := gjson.GetBytes(body, "instructions")
+	if !instructionsResult.Exists() {
+		// Create instructions field with the prompt
+		modified, err := sjson.SetBytes(body, "instructions", prompt)
+		if err != nil {
+			return body, false
+		}
+		return modified, true
+	}
+
+	// Prepend to existing instructions
+	existingInstructions := instructionsResult.String()
+	newInstructions := prompt + "\n\n" + existingInstructions
+	modified, err := sjson.SetBytes(body, "instructions", newInstructions)
+	if err != nil {
+		return body, false
+	}
+	return modified, true
+}
+
 const imageStrippedPlaceholder = "[Image removed: this model does not support vision input. Briefly inform the user their image was not processed and suggest describing it in text instead.]"
 
 // StripImageInputAsText replaces image content parts with a text placeholder
