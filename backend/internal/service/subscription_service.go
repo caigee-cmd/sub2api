@@ -349,6 +349,12 @@ func (s *SubscriptionService) updateExistingSubscriptionTerm(
 			return fmt.Errorf("extend subscription: %w", err)
 		}
 
+		// 重置用量窗口（续费时清零当前周期额度）
+		dailyStart := timezone.StartOfDay(now)
+		if err := s.userSubRepo.ResetUsageWindows(txCtx, existingSub.ID, true, true, true, dailyStart, now); err != nil {
+			return fmt.Errorf("reset usage windows on renewal: %w", err)
+		}
+
 		// 如果订阅被暂停，恢复为 active 状态
 		if existingSub.Status != SubscriptionStatusActive {
 			if err := s.userSubRepo.UpdateStatus(txCtx, existingSub.ID, SubscriptionStatusActive); err != nil {
