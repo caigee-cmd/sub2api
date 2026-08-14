@@ -25,6 +25,7 @@ import (
 	"github.com/Wei-Shaw/sub2api/internal/pkg/oauth"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/response"
 	"github.com/Wei-Shaw/sub2api/internal/service"
+	"github.com/Wei-Shaw/sub2api/internal/util/logredact"
 
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
@@ -617,7 +618,7 @@ type completeOIDCOAuthRequest struct {
 func (h *AuthHandler) CompleteOIDCOAuthRegistration(c *gin.Context) {
 	var req completeOIDCOAuthRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "INVALID_REQUEST", "message": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "INVALID_REQUEST", "message": logredact.RedactUpstreamURL(err.Error())})
 		return
 	}
 

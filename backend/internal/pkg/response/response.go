@@ -58,6 +58,7 @@ func Accepted(c *gin.Context, data any) {
 
 // Error 返回错误响应
 func Error(c *gin.Context, statusCode int, message string) {
+	message = logredact.RedactUpstreamURL(message)
 	c.JSON(statusCode, Response{
 		Code:     statusCode,
 		Message:  message,
@@ -69,6 +70,7 @@ func Error(c *gin.Context, statusCode int, message string) {
 // ErrorWithDetails returns an error response compatible with the existing envelope while
 // optionally providing structured error fields (reason/metadata).
 func ErrorWithDetails(c *gin.Context, statusCode int, message, reason string, metadata map[string]string) {
+	message = logredact.RedactUpstreamURL(message)
 	c.JSON(statusCode, Response{
 		Code:     statusCode,
 		Message:  message,

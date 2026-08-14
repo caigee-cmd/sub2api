@@ -7,6 +7,7 @@ import (
 	"github.com/Wei-Shaw/sub2api/internal/pkg/ctxkey"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/googleapi"
 	"github.com/Wei-Shaw/sub2api/internal/service"
+	"github.com/Wei-Shaw/sub2api/internal/util/logredact"
 	"github.com/gin-gonic/gin"
 )
 
@@ -76,12 +77,14 @@ func NewErrorResponse(code, message string) ErrorResponse {
 
 // AbortWithError 中断请求并返回JSON错误
 func AbortWithError(c *gin.Context, statusCode int, code, message string) {
+	message = logredact.RedactUpstreamURL(message)
 	c.JSON(statusCode, NewErrorResponse(code, message))
 	c.Abort()
 }
 
 // abortWithOpenAIQuotaError writes the OpenAI-compatible insufficient quota response.
 func abortWithOpenAIQuotaError(c *gin.Context, statusCode int, message string) {
+	message = logredact.RedactUpstreamURL(message)
 	c.JSON(statusCode, gin.H{
 		"error": gin.H{
 			"message": message,
@@ -102,6 +105,7 @@ type GatewayErrorWriter func(c *gin.Context, status int, message string)
 
 // AnthropicErrorWriter 按 Anthropic API 规范输出错误
 func AnthropicErrorWriter(c *gin.Context, status int, message string) {
+	message = logredact.RedactUpstreamURL(message)
 	c.JSON(status, gin.H{
 		"type":  "error",
 		"error": gin.H{"type": "permission_error", "message": message},
@@ -110,6 +114,7 @@ func AnthropicErrorWriter(c *gin.Context, status int, message string) {
 
 // GoogleErrorWriter 按 Google API 规范输出错误
 func GoogleErrorWriter(c *gin.Context, status int, message string) {
+	message = logredact.RedactUpstreamURL(message)
 	c.JSON(status, gin.H{
 		"error": gin.H{
 			"code":    status,

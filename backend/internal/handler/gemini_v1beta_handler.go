@@ -21,6 +21,7 @@ import (
 	"github.com/Wei-Shaw/sub2api/internal/pkg/logger"
 	"github.com/Wei-Shaw/sub2api/internal/server/middleware"
 	"github.com/Wei-Shaw/sub2api/internal/service"
+	"github.com/Wei-Shaw/sub2api/internal/util/logredact"
 	"github.com/google/uuid"
 
 	"github.com/gin-gonic/gin"
@@ -691,6 +692,7 @@ type pathParseError struct{ msg string }
 func (e *pathParseError) Error() string { return e.msg }
 
 func googleError(c *gin.Context, status int, message string) {
+	message = logredact.RedactUpstreamURL(message)
 	c.JSON(status, gin.H{
 		"error": gin.H{
 			"code":    status,

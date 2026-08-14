@@ -42,7 +42,7 @@ var (
 	ErrAdjustWouldExpire           = infraerrors.BadRequest("ADJUST_WOULD_EXPIRE", "adjustment would result in expired subscription (remaining days must be > 0)")
 
 	// 升级相关错误码
-	ErrSubscriptionUpgradeNotHigher     = infraerrors.BadRequest("SUBSCRIPTION_UPGRADE_NOT_HIGHER", "target plan must be higher tier than current")
+	ErrSubscriptionUpgradeNotHigher    = infraerrors.BadRequest("SUBSCRIPTION_UPGRADE_NOT_HIGHER", "target plan must be higher tier than current")
 	ErrSubscriptionUpgradeNotActive    = infraerrors.BadRequest("SUBSCRIPTION_UPGRADE_NOT_ACTIVE", "only active subscriptions can be upgraded")
 	ErrSubscriptionUpgradeSameGroup    = infraerrors.BadRequest("SUBSCRIPTION_UPGRADE_SAME_GROUP", "upgrade must target a different group (use renew for same group)")
 	ErrSubscriptionUpgradePlanNotFound = infraerrors.NotFound("SUBSCRIPTION_UPGRADE_PLAN_NOT_FOUND", "target plan not found or not for sale")
@@ -1263,13 +1263,13 @@ func (s *SubscriptionService) ValidateSubscription(ctx context.Context, sub *Use
 
 // UpgradePreviewResult 升级预览结果（给 handler 直接序列化）
 type UpgradePreviewResult struct {
-	OldPlan        *dbent.SubscriptionPlan `json:"old_plan"`
-	NewPlan        *dbent.SubscriptionPlan `json:"new_plan"`
-	RemainingDays  int                     `json:"remaining_days"`
-	TotalDays      int                     `json:"total_days"`
-	Credit         float64                 `json:"credit"`
-	Payable        float64                 `json:"payable"`
-	NewExpiresAt   time.Time               `json:"new_expires_at"`
+	OldPlan       *dbent.SubscriptionPlan `json:"old_plan"`
+	NewPlan       *dbent.SubscriptionPlan `json:"new_plan"`
+	RemainingDays int                     `json:"remaining_days"`
+	TotalDays     int                     `json:"total_days"`
+	Credit        float64                 `json:"credit"`
+	Payable       float64                 `json:"payable"`
+	NewExpiresAt  time.Time               `json:"new_expires_at"`
 }
 
 // PreviewUpgrade 预览升级：计算从当前订阅升级到 newPlanID 的 proration 抵扣与实付金额。
@@ -1337,9 +1337,10 @@ func (s *SubscriptionService) PreviewUpgrade(ctx context.Context, userID, subscr
 }
 
 // resolveOldPlanForSubscription 推算订阅的原始套餐：
-//  . sub.PlanID 非空 -> 直接 GetPlan（新购买透传 plan_id 的场景）
-//  2. sub.PlanID 为空 -> 按 (expires_at - starts_at) 实际天数匹配 group 下 for_sale plan，
-//     取折算天数最接近的那个。兼容历史订阅（admin 分配/兑换码/旧购买）。
+//
+//	. sub.PlanID 非空 -> 直接 GetPlan（新购买透传 plan_id 的场景）
+//	2. sub.PlanID 为空 -> 按 (expires_at - starts_at) 实际天数匹配 group 下 for_sale plan，
+//	   取折算天数最接近的那个。兼容历史订阅（admin 分配/兑换码/旧购买）。
 //
 // 匹配不上（group 下无 for_sale plan，或天数差距过大）返回 ErrSubscriptionUpgradeNoOldPlan。
 func (s *SubscriptionService) resolveOldPlanForSubscription(ctx context.Context, sub *UserSubscription) (*dbent.SubscriptionPlan, error) {

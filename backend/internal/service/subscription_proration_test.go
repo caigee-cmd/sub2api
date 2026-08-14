@@ -128,7 +128,7 @@ func TestComputeUpgradeProration_ZeroRemaining(t *testing.T) {
 func TestComputeUpgradeProration_NotHigherRejected(t *testing.T) {
 	// newPlan.price <= oldPlan.price 应该被拒绝
 	cases := []struct {
-		name    string
+		name     string
 		oldPrice float64
 		newPrice float64
 	}{

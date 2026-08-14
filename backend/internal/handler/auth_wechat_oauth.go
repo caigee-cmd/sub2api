@@ -20,6 +20,7 @@ import (
 	"github.com/Wei-Shaw/sub2api/internal/pkg/oauth"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/response"
 	"github.com/Wei-Shaw/sub2api/internal/service"
+	"github.com/Wei-Shaw/sub2api/internal/util/logredact"
 
 	"github.com/gin-gonic/gin"
 )
@@ -497,7 +498,7 @@ type completeWeChatOAuthRequest struct {
 func (h *AuthHandler) CompleteWeChatOAuthRegistration(c *gin.Context) {
 	var req completeWeChatOAuthRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "INVALID_REQUEST", "message": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "INVALID_REQUEST", "message": logredact.RedactUpstreamURL(err.Error())})
 		return
 	}
 

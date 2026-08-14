@@ -23,6 +23,7 @@ import (
 	"github.com/Wei-Shaw/sub2api/internal/pkg/response"
 	servermiddleware "github.com/Wei-Shaw/sub2api/internal/server/middleware"
 	"github.com/Wei-Shaw/sub2api/internal/service"
+	"github.com/Wei-Shaw/sub2api/internal/util/logredact"
 
 	"github.com/gin-gonic/gin"
 	"github.com/imroc/req/v3"
@@ -514,7 +515,7 @@ type completeLinuxDoOAuthRequest struct {
 func (h *AuthHandler) CompleteLinuxDoOAuthRegistration(c *gin.Context) {
 	var req completeLinuxDoOAuthRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "INVALID_REQUEST", "message": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "INVALID_REQUEST", "message": logredact.RedactUpstreamURL(err.Error())})
 		return
 	}
 
