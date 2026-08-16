@@ -18,7 +18,7 @@ const (
 	paymentOrderExpiryLeaderLockKey = "payment:order:expiry:leader"
 	// paymentOrderExpiryLeaderLockTTL must exceed the combined reconcile + expiry
 	// timeouts (2 * expiryCheckTimeout) so the lock never expires mid-run.
-	paymentOrderExpiryLeaderLockTTL = 3 * time.Minute
+	paymentOrderExpiryLeaderLockTTL = 5 * time.Minute
 )
 
 // PaymentOrderExpiryService periodically expires timed-out payment orders.
@@ -115,5 +115,17 @@ func (s *PaymentOrderExpiryService) runOnce() {
 	}
 	if expired > 0 {
 		slog.Info("[PaymentOrderExpiry] expired timed-out orders", "count", expired)
+	}
+
+	// Step 3: retry orders stuck in PAID/FAILED (fulfillment never completed)
+	retryCtx, retryCancel := context.WithTimeout(context.Background(), expiryCheckTimeout)
+	defer retryCancel()
+	retried, err := s.paymentSvc.ReconcileStuckOrders(retryCtx)
+	if err != nil {
+		slog.Error("[PaymentOrderExpiry] failed to retry stuck orders", "error", err)
+		return
+	}
+	if retried > 0 {
+		slog.Info("[PaymentOrderExpiry] retried stuck orders", "count", retried)
 	}
 }

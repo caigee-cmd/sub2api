@@ -899,3 +899,45 @@ func (s *PaymentService) RetryFulfillment(ctx context.Context, oid int64) error 
 	s.writeAuditLog(ctx, oid, "RECHARGE_RETRY", "admin", map[string]any{"detail": "admin manual retry"})
 	return s.executeFulfillment(ctx, oid)
 }
+
+// ReconcileStuckOrders scans for orders stuck in PAID or FAILED status and retries fulfillment.
+// This handles cases where fulfillment failed due to context timeout or transient errors.
+// Only processes orders that have been stuck for at least 5 minutes to avoid competing with active fulfillment.
+func (s *PaymentService) ReconcileStuckOrders(ctx context.Context) (int, error) {
+	now := time.Now()
+	stuckBefore := now.Add(-5 * time.Minute)
+
+	orders, err := s.entClient.PaymentOrder.Query().
+		Where(
+			paymentorder.StatusIn(OrderStatusPaid, OrderStatusFailed),
+			paymentorder.PaidAtNotNil(),
+			paymentorder.UpdatedAtLT(stuckBefore),
+		).
+		Order(dbent.Asc(paymentorder.FieldUpdatedAt)).
+		Limit(10).
+		All(ctx)
+	if err != nil {
+		return 0, fmt.Errorf("query stuck orders: %w", err)
+	}
+
+	retried := 0
+	for _, o := range orders {
+		// Use independent context for each order to avoid shared timeout issues
+		orderCtx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+		err := s.executeFulfillment(orderCtx, o.ID)
+		cancel()
+
+		if err != nil {
+			slog.Error("stuck order retry failed", "orderID", o.ID, "status", o.Status, "error", err)
+			continue
+		}
+
+		s.writeAuditLog(ctx, o.ID, "STUCK_ORDER_RETRIED", "system", map[string]any{
+			"previousStatus": o.Status,
+			"stuckDuration":  now.Sub(o.UpdatedAt).String(),
+		})
+		retried++
+	}
+
+	return retried, nil
+}
