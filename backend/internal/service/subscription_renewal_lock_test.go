@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/Wei-Shaw/sub2api/internal/pkg/timezone"
 	"github.com/stretchr/testify/require"
 )
 
@@ -62,6 +63,32 @@ func (r *lockingRenewalRepo) UpdateNotes(_ context.Context, _ int64, notes strin
 	return nil
 }
 
+func (r *lockingRenewalRepo) UpdateAutoBalance(_ context.Context, _ int64, enabled bool) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.current.AutoBalanceEnabled = enabled
+	return nil
+}
+
+// ResetUsageWindows 模拟生产行为：续费时重置用量并把窗口锚点推进到新周期。
+func (r *lockingRenewalRepo) ResetUsageWindows(_ context.Context, _ int64, resetDaily, resetWeekly, resetMonthly bool, dailyStart, periodicStart time.Time) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if resetDaily {
+		r.current.DailyUsageUSD = 0
+		r.current.DailyWindowStart = &dailyStart
+	}
+	if resetWeekly {
+		r.current.WeeklyUsageUSD = 0
+		r.current.WeeklyWindowStart = &periodicStart
+	}
+	if resetMonthly {
+		r.current.MonthlyUsageUSD = 0
+		r.current.MonthlyWindowStart = &periodicStart
+	}
+	return nil
+}
+
 func (r *lockingRenewalRepo) Update(_ context.Context, sub *UserSubscription) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -93,8 +120,9 @@ func TestAssignOrExtendSubscriptionUsesLockedCurrentRow(t *testing.T) {
 	require.Equal(t, lockedExpiry.AddDate(0, 0, 5), sub.ExpiresAt)
 	require.Equal(t, SubscriptionStatusActive, sub.Status)
 	require.Equal(t, "current\nrenewed", sub.Notes)
-	require.Equal(t, windowStart, *sub.DailyWindowStart)
-	require.Equal(t, float64(4), sub.DailyUsageUSD)
+	// 续费会重置用量并把日窗口锚点推进到当天 0 点（b259f74c0）。
+	require.Equal(t, timezone.StartOfDay(now), *sub.DailyWindowStart)
+	require.Equal(t, float64(0), sub.DailyUsageUSD)
 }
 
 func TestAssignOrExtendSubscriptionSerializedRenewalsAccumulateDays(t *testing.T) {

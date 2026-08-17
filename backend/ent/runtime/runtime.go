@@ -2448,6 +2448,10 @@ func init() {
 	usersubscriptionDescAssignedAt := usersubscriptionFields[13].Descriptor()
 	// usersubscription.DefaultAssignedAt holds the default value on creation for the assigned_at field.
 	usersubscription.DefaultAssignedAt = usersubscriptionDescAssignedAt.Default.(func() time.Time)
+	// usersubscriptionDescAutoBalanceEnabled is the schema descriptor for auto_balance_enabled field.
+	usersubscriptionDescAutoBalanceEnabled := usersubscriptionFields[15].Descriptor()
+	// usersubscription.DefaultAutoBalanceEnabled holds the default value on creation for the auto_balance_enabled field.
+	usersubscription.DefaultAutoBalanceEnabled = usersubscriptionDescAutoBalanceEnabled.Default.(bool)
 }
 
 const (

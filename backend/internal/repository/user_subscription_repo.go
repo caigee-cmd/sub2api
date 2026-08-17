@@ -41,6 +41,12 @@ func (r *userSubscriptionRepository) Create(ctx context.Context, sub *service.Us
 		SetMonthlyUsageUsd(sub.MonthlyUsageUSD).
 		SetNillableAssignedBy(sub.AssignedBy)
 
+	// 默认值为 true（DB schema default）。显式传入 true 时才设置，
+	// 避免零值结构体覆盖默认开启的行为。
+	if sub.AutoBalanceEnabled {
+		builder.SetAutoBalanceEnabled(true)
+	}
+
 	if sub.StartsAt.IsZero() {
 		builder.SetStartsAt(time.Now())
 	} else {
@@ -153,7 +159,8 @@ func (r *userSubscriptionRepository) Update(ctx context.Context, sub *service.Us
 		SetMonthlyUsageUsd(sub.MonthlyUsageUSD).
 		SetNillableAssignedBy(sub.AssignedBy).
 		SetAssignedAt(sub.AssignedAt).
-		SetNotes(sub.Notes)
+		SetNotes(sub.Notes).
+		SetAutoBalanceEnabled(sub.AutoBalanceEnabled)
 
 	updated, err := builder.Save(ctx)
 	if err == nil {
@@ -366,6 +373,14 @@ func (r *userSubscriptionRepository) UpdateNotes(ctx context.Context, subscripti
 	client := clientFromContext(ctx, r.client)
 	_, err := client.UserSubscription.UpdateOneID(subscriptionID).
 		SetNotes(notes).
+		Save(ctx)
+	return translatePersistenceError(err, service.ErrSubscriptionNotFound, nil)
+}
+
+func (r *userSubscriptionRepository) UpdateAutoBalance(ctx context.Context, subscriptionID int64, enabled bool) error {
+	client := clientFromContext(ctx, r.client)
+	_, err := client.UserSubscription.UpdateOneID(subscriptionID).
+		SetAutoBalanceEnabled(enabled).
 		Save(ctx)
 	return translatePersistenceError(err, service.ErrSubscriptionNotFound, nil)
 }
@@ -659,6 +674,7 @@ func userSubscriptionEntityToServiceWithStatusMapping(m *dbent.UserSubscription,
 		AssignedBy:         m.AssignedBy,
 		AssignedAt:         m.AssignedAt,
 		Notes:              derefString(m.Notes),
+		AutoBalanceEnabled: m.AutoBalanceEnabled,
 		CreatedAt:          m.CreatedAt,
 		UpdatedAt:          m.UpdatedAt,
 		DeletedAt:          m.DeletedAt,

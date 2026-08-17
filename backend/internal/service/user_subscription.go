@@ -33,6 +33,9 @@ type UserSubscription struct {
 	AssignedAt time.Time
 	Notes      string
 
+	// AutoBalanceEnabled 控制订阅额度超限/到期后是否自动降级为余额计费。
+	AutoBalanceEnabled bool
+
 	CreatedAt time.Time
 	UpdatedAt time.Time
 	DeletedAt *time.Time

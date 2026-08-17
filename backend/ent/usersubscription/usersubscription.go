@@ -51,6 +51,8 @@ const (
 	FieldAssignedAt = "assigned_at"
 	// FieldNotes holds the string denoting the notes field in the database.
 	FieldNotes = "notes"
+	// FieldAutoBalanceEnabled holds the string denoting the auto_balance_enabled field in the database.
+	FieldAutoBalanceEnabled = "auto_balance_enabled"
 	// EdgeUser holds the string denoting the user edge name in mutations.
 	EdgeUser = "user"
 	// EdgeGroup holds the string denoting the group edge name in mutations.
@@ -112,6 +114,7 @@ var Columns = []string{
 	FieldAssignedBy,
 	FieldAssignedAt,
 	FieldNotes,
+	FieldAutoBalanceEnabled,
 }
 
 // ValidColumn reports if the column name is valid (part of the table columns).
@@ -150,6 +153,8 @@ var (
 	DefaultMonthlyUsageUsd float64
 	// DefaultAssignedAt holds the default value on creation for the "assigned_at" field.
 	DefaultAssignedAt func() time.Time
+	// DefaultAutoBalanceEnabled holds the default value on creation for the "auto_balance_enabled" field.
+	DefaultAutoBalanceEnabled bool
 )
 
 // OrderOption defines the ordering options for the UserSubscription queries.
@@ -248,6 +253,11 @@ func ByAssignedAt(opts ...sql.OrderTermOption) OrderOption {
 // ByNotes orders the results by the notes field.
 func ByNotes(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldNotes, opts...).ToFunc()
+}
+
+// ByAutoBalanceEnabled orders the results by the auto_balance_enabled field.
+func ByAutoBalanceEnabled(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldAutoBalanceEnabled, opts...).ToFunc()
 }
 
 // ByUserField orders the results by user field.

@@ -54456,6 +54456,7 @@ type UserSubscriptionMutation struct {
 	addmonthly_usage_usd    *float64
 	assigned_at             *time.Time
 	notes                   *string
+	auto_balance_enabled    *bool
 	clearedFields           map[string]struct{}
 	user                    *int64
 	cleareduser             bool
@@ -55389,6 +55390,42 @@ func (m *UserSubscriptionMutation) ResetNotes() {
 	delete(m.clearedFields, usersubscription.FieldNotes)
 }
 
+// SetAutoBalanceEnabled sets the "auto_balance_enabled" field.
+func (m *UserSubscriptionMutation) SetAutoBalanceEnabled(b bool) {
+	m.auto_balance_enabled = &b
+}
+
+// AutoBalanceEnabled returns the value of the "auto_balance_enabled" field in the mutation.
+func (m *UserSubscriptionMutation) AutoBalanceEnabled() (r bool, exists bool) {
+	v := m.auto_balance_enabled
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldAutoBalanceEnabled returns the old "auto_balance_enabled" field's value of the UserSubscription entity.
+// If the UserSubscription object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *UserSubscriptionMutation) OldAutoBalanceEnabled(ctx context.Context) (v bool, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldAutoBalanceEnabled is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldAutoBalanceEnabled requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldAutoBalanceEnabled: %w", err)
+	}
+	return oldValue.AutoBalanceEnabled, nil
+}
+
+// ResetAutoBalanceEnabled resets all changes to the "auto_balance_enabled" field.
+func (m *UserSubscriptionMutation) ResetAutoBalanceEnabled() {
+	m.auto_balance_enabled = nil
+}
+
 // ClearUser clears the "user" edge to the User entity.
 func (m *UserSubscriptionMutation) ClearUser() {
 	m.cleareduser = true
@@ -55571,7 +55608,7 @@ func (m *UserSubscriptionMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *UserSubscriptionMutation) Fields() []string {
-	fields := make([]string, 0, 18)
+	fields := make([]string, 0, 19)
 	if m.created_at != nil {
 		fields = append(fields, usersubscription.FieldCreatedAt)
 	}
@@ -55626,6 +55663,9 @@ func (m *UserSubscriptionMutation) Fields() []string {
 	if m.notes != nil {
 		fields = append(fields, usersubscription.FieldNotes)
 	}
+	if m.auto_balance_enabled != nil {
+		fields = append(fields, usersubscription.FieldAutoBalanceEnabled)
+	}
 	return fields
 }
 
@@ -55670,6 +55710,8 @@ func (m *UserSubscriptionMutation) Field(name string) (ent.Value, bool) {
 		return m.AssignedAt()
 	case usersubscription.FieldNotes:
 		return m.Notes()
+	case usersubscription.FieldAutoBalanceEnabled:
+		return m.AutoBalanceEnabled()
 	}
 	return nil, false
 }
@@ -55715,6 +55757,8 @@ func (m *UserSubscriptionMutation) OldField(ctx context.Context, name string) (e
 		return m.OldAssignedAt(ctx)
 	case usersubscription.FieldNotes:
 		return m.OldNotes(ctx)
+	case usersubscription.FieldAutoBalanceEnabled:
+		return m.OldAutoBalanceEnabled(ctx)
 	}
 	return nil, fmt.Errorf("unknown UserSubscription field %s", name)
 }
@@ -55849,6 +55893,13 @@ func (m *UserSubscriptionMutation) SetField(name string, value ent.Value) error 
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetNotes(v)
+		return nil
+	case usersubscription.FieldAutoBalanceEnabled:
+		v, ok := value.(bool)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetAutoBalanceEnabled(v)
 		return nil
 	}
 	return fmt.Errorf("unknown UserSubscription field %s", name)
@@ -56048,6 +56099,9 @@ func (m *UserSubscriptionMutation) ResetField(name string) error {
 		return nil
 	case usersubscription.FieldNotes:
 		m.ResetNotes()
+		return nil
+	case usersubscription.FieldAutoBalanceEnabled:
+		m.ResetAutoBalanceEnabled()
 		return nil
 	}
 	return fmt.Errorf("unknown UserSubscription field %s", name)

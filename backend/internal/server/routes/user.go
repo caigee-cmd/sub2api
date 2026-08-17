@@ -135,6 +135,8 @@ func RegisterUserRoutes(
 			subscriptions.GET("/summary", h.Subscription.GetSummary)
 			// 升级预览（只读计算 proration 抵扣与实付金额）
 			subscriptions.POST("/:id/upgrade-preview", h.Subscription.UpgradePreview)
+			// 自动余额降级开关（额度超限/到期后自动扣余额）
+			subscriptions.PUT("/:id/auto-balance", h.Subscription.SetAutoBalance)
 		}
 
 		// 渠道监控（用户只读）

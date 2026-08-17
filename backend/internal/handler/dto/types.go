@@ -640,6 +640,9 @@ type UserSubscription struct {
 	WeeklyUsageUSD  float64 `json:"weekly_usage_usd"`
 	MonthlyUsageUSD float64 `json:"monthly_usage_usd"`
 
+	// AutoBalanceEnabled 控制订阅额度超限/到期后是否自动降级为余额计费。
+	AutoBalanceEnabled bool `json:"auto_balance_enabled"`
+
 	CreatedAt time.Time  `json:"created_at"`
 	UpdatedAt time.Time  `json:"updated_at"`
 	RevokedAt *time.Time `json:"revoked_at,omitempty"`

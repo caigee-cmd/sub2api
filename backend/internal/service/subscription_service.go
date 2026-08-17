@@ -782,6 +782,45 @@ func (s *SubscriptionService) GetActiveSubscription(ctx context.Context, userID,
 	return &cp, nil
 }
 
+// CheckAutoBalanceFallback 检查订阅不可用（过期/不存在）时是否允许降级为余额计费。
+// 取该用户在该分组最近一条未删除订阅的 auto_balance_enabled；
+// 无订阅记录或查询失败返回 false（维持原拒绝行为）。
+func (s *SubscriptionService) CheckAutoBalanceFallback(ctx context.Context, userID, groupID int64) bool {
+	sub, err := s.userSubRepo.GetByUserIDAndGroupID(ctx, userID, groupID)
+	if err != nil || sub == nil {
+		return false
+	}
+	return sub.AutoBalanceEnabled
+}
+
+// SetAutoBalanceEnabled 更新订阅的自动余额降级开关（用户自服务）。
+// 校验归属后窄更新并失效订阅相关缓存。
+func (s *SubscriptionService) SetAutoBalanceEnabled(ctx context.Context, subscriptionID, userID int64, enabled bool) (*UserSubscription, error) {
+	sub, err := s.userSubRepo.GetByID(ctx, subscriptionID)
+	if err != nil {
+		return nil, ErrSubscriptionNotFound
+	}
+	if sub.UserID != userID {
+		return nil, infraerrors.Forbidden("FORBIDDEN", "cannot modify another user's subscription")
+	}
+
+	if err := s.userSubRepo.UpdateAutoBalance(ctx, subscriptionID, enabled); err != nil {
+		return nil, err
+	}
+
+	s.InvalidateSubCache(sub.UserID, sub.GroupID)
+	if s.billingCacheService != nil {
+		uID, gID := sub.UserID, sub.GroupID
+		go func() {
+			cacheCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer cancel()
+			_ = s.billingCacheService.InvalidateSubscription(cacheCtx, uID, gID)
+		}()
+	}
+
+	return s.userSubRepo.GetByID(ctx, subscriptionID)
+}
+
 // ListUserSubscriptions 获取用户的所有订阅
 func (s *SubscriptionService) ListUserSubscriptions(ctx context.Context, userID int64) ([]UserSubscription, error) {
 	subs, err := s.userSubRepo.ListByUserID(ctx, userID)

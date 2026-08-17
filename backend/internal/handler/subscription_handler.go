@@ -224,3 +224,38 @@ func (h *SubscriptionHandler) UpgradePreview(c *gin.Context) {
 
 	response.Success(c, result)
 }
+
+// setAutoBalanceRequest 自动余额降级开关请求体
+type setAutoBalanceRequest struct {
+	Enabled *bool `json:"enabled" binding:"required"`
+}
+
+// SetAutoBalance 更新订阅的自动余额降级开关。
+// PUT /api/v1/subscriptions/:id/auto-balance
+func (h *SubscriptionHandler) SetAutoBalance(c *gin.Context) {
+	subject, ok := middleware2.GetAuthSubjectFromContext(c)
+	if !ok {
+		response.Unauthorized(c, "User not found in context")
+		return
+	}
+
+	subID, err := strconv.ParseInt(c.Param("id"), 10, 64)
+	if err != nil || subID <= 0 {
+		response.BadRequest(c, "Invalid subscription id")
+		return
+	}
+
+	var req setAutoBalanceRequest
+	if err := c.ShouldBindJSON(&req); err != nil || req.Enabled == nil {
+		response.BadRequest(c, "Invalid request: enabled is required")
+		return
+	}
+
+	sub, err := h.subscriptionService.SetAutoBalanceEnabled(c.Request.Context(), subID, subject.UserID, *req.Enabled)
+	if err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
+
+	response.Success(c, dto.UserSubscriptionFromService(sub))
+}

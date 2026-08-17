@@ -331,6 +331,20 @@ func (_u *UserSubscriptionUpdate) ClearNotes() *UserSubscriptionUpdate {
 	return _u
 }
 
+// SetAutoBalanceEnabled sets the "auto_balance_enabled" field.
+func (_u *UserSubscriptionUpdate) SetAutoBalanceEnabled(v bool) *UserSubscriptionUpdate {
+	_u.mutation.SetAutoBalanceEnabled(v)
+	return _u
+}
+
+// SetNillableAutoBalanceEnabled sets the "auto_balance_enabled" field if the given value is not nil.
+func (_u *UserSubscriptionUpdate) SetNillableAutoBalanceEnabled(v *bool) *UserSubscriptionUpdate {
+	if v != nil {
+		_u.SetAutoBalanceEnabled(*v)
+	}
+	return _u
+}
+
 // SetUser sets the "user" edge to the User entity.
 func (_u *UserSubscriptionUpdate) SetUser(v *User) *UserSubscriptionUpdate {
 	return _u.SetUserID(v.ID)
@@ -560,6 +574,9 @@ func (_u *UserSubscriptionUpdate) sqlSave(ctx context.Context) (_node int, err e
 	}
 	if _u.mutation.NotesCleared() {
 		_spec.ClearField(usersubscription.FieldNotes, field.TypeString)
+	}
+	if value, ok := _u.mutation.AutoBalanceEnabled(); ok {
+		_spec.SetField(usersubscription.FieldAutoBalanceEnabled, field.TypeBool, value)
 	}
 	if _u.mutation.UserCleared() {
 		edge := &sqlgraph.EdgeSpec{
@@ -1013,6 +1030,20 @@ func (_u *UserSubscriptionUpdateOne) ClearNotes() *UserSubscriptionUpdateOne {
 	return _u
 }
 
+// SetAutoBalanceEnabled sets the "auto_balance_enabled" field.
+func (_u *UserSubscriptionUpdateOne) SetAutoBalanceEnabled(v bool) *UserSubscriptionUpdateOne {
+	_u.mutation.SetAutoBalanceEnabled(v)
+	return _u
+}
+
+// SetNillableAutoBalanceEnabled sets the "auto_balance_enabled" field if the given value is not nil.
+func (_u *UserSubscriptionUpdateOne) SetNillableAutoBalanceEnabled(v *bool) *UserSubscriptionUpdateOne {
+	if v != nil {
+		_u.SetAutoBalanceEnabled(*v)
+	}
+	return _u
+}
+
 // SetUser sets the "user" edge to the User entity.
 func (_u *UserSubscriptionUpdateOne) SetUser(v *User) *UserSubscriptionUpdateOne {
 	return _u.SetUserID(v.ID)
@@ -1272,6 +1303,9 @@ func (_u *UserSubscriptionUpdateOne) sqlSave(ctx context.Context) (_node *UserSu
 	}
 	if _u.mutation.NotesCleared() {
 		_spec.ClearField(usersubscription.FieldNotes, field.TypeString)
+	}
+	if value, ok := _u.mutation.AutoBalanceEnabled(); ok {
+		_spec.SetField(usersubscription.FieldAutoBalanceEnabled, field.TypeBool, value)
 	}
 	if _u.mutation.UserCleared() {
 		edge := &sqlgraph.EdgeSpec{

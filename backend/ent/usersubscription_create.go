@@ -245,6 +245,20 @@ func (_c *UserSubscriptionCreate) SetNillableNotes(v *string) *UserSubscriptionC
 	return _c
 }
 
+// SetAutoBalanceEnabled sets the "auto_balance_enabled" field.
+func (_c *UserSubscriptionCreate) SetAutoBalanceEnabled(v bool) *UserSubscriptionCreate {
+	_c.mutation.SetAutoBalanceEnabled(v)
+	return _c
+}
+
+// SetNillableAutoBalanceEnabled sets the "auto_balance_enabled" field if the given value is not nil.
+func (_c *UserSubscriptionCreate) SetNillableAutoBalanceEnabled(v *bool) *UserSubscriptionCreate {
+	if v != nil {
+		_c.SetAutoBalanceEnabled(*v)
+	}
+	return _c
+}
+
 // SetUser sets the "user" edge to the User entity.
 func (_c *UserSubscriptionCreate) SetUser(v *User) *UserSubscriptionCreate {
 	return _c.SetUserID(v.ID)
@@ -363,6 +377,10 @@ func (_c *UserSubscriptionCreate) defaults() error {
 		v := usersubscription.DefaultAssignedAt()
 		_c.mutation.SetAssignedAt(v)
 	}
+	if _, ok := _c.mutation.AutoBalanceEnabled(); !ok {
+		v := usersubscription.DefaultAutoBalanceEnabled
+		_c.mutation.SetAutoBalanceEnabled(v)
+	}
 	return nil
 }
 
@@ -405,6 +423,9 @@ func (_c *UserSubscriptionCreate) check() error {
 	}
 	if _, ok := _c.mutation.AssignedAt(); !ok {
 		return &ValidationError{Name: "assigned_at", err: errors.New(`ent: missing required field "UserSubscription.assigned_at"`)}
+	}
+	if _, ok := _c.mutation.AutoBalanceEnabled(); !ok {
+		return &ValidationError{Name: "auto_balance_enabled", err: errors.New(`ent: missing required field "UserSubscription.auto_balance_enabled"`)}
 	}
 	if len(_c.mutation.UserIDs()) == 0 {
 		return &ValidationError{Name: "user", err: errors.New(`ent: missing required edge "UserSubscription.user"`)}
@@ -498,6 +519,10 @@ func (_c *UserSubscriptionCreate) createSpec() (*UserSubscription, *sqlgraph.Cre
 	if value, ok := _c.mutation.Notes(); ok {
 		_spec.SetField(usersubscription.FieldNotes, field.TypeString, value)
 		_node.Notes = &value
+	}
+	if value, ok := _c.mutation.AutoBalanceEnabled(); ok {
+		_spec.SetField(usersubscription.FieldAutoBalanceEnabled, field.TypeBool, value)
+		_node.AutoBalanceEnabled = value
 	}
 	if nodes := _c.mutation.UserIDs(); len(nodes) > 0 {
 		edge := &sqlgraph.EdgeSpec{
@@ -888,6 +913,18 @@ func (u *UserSubscriptionUpsert) ClearNotes() *UserSubscriptionUpsert {
 	return u
 }
 
+// SetAutoBalanceEnabled sets the "auto_balance_enabled" field.
+func (u *UserSubscriptionUpsert) SetAutoBalanceEnabled(v bool) *UserSubscriptionUpsert {
+	u.Set(usersubscription.FieldAutoBalanceEnabled, v)
+	return u
+}
+
+// UpdateAutoBalanceEnabled sets the "auto_balance_enabled" field to the value that was provided on create.
+func (u *UserSubscriptionUpsert) UpdateAutoBalanceEnabled() *UserSubscriptionUpsert {
+	u.SetExcluded(usersubscription.FieldAutoBalanceEnabled)
+	return u
+}
+
 // UpdateNewValues updates the mutable fields using the new values that were set on create.
 // Using this option is equivalent to using:
 //
@@ -1245,6 +1282,20 @@ func (u *UserSubscriptionUpsertOne) UpdateNotes() *UserSubscriptionUpsertOne {
 func (u *UserSubscriptionUpsertOne) ClearNotes() *UserSubscriptionUpsertOne {
 	return u.Update(func(s *UserSubscriptionUpsert) {
 		s.ClearNotes()
+	})
+}
+
+// SetAutoBalanceEnabled sets the "auto_balance_enabled" field.
+func (u *UserSubscriptionUpsertOne) SetAutoBalanceEnabled(v bool) *UserSubscriptionUpsertOne {
+	return u.Update(func(s *UserSubscriptionUpsert) {
+		s.SetAutoBalanceEnabled(v)
+	})
+}
+
+// UpdateAutoBalanceEnabled sets the "auto_balance_enabled" field to the value that was provided on create.
+func (u *UserSubscriptionUpsertOne) UpdateAutoBalanceEnabled() *UserSubscriptionUpsertOne {
+	return u.Update(func(s *UserSubscriptionUpsert) {
+		s.UpdateAutoBalanceEnabled()
 	})
 }
 
@@ -1771,6 +1822,20 @@ func (u *UserSubscriptionUpsertBulk) UpdateNotes() *UserSubscriptionUpsertBulk {
 func (u *UserSubscriptionUpsertBulk) ClearNotes() *UserSubscriptionUpsertBulk {
 	return u.Update(func(s *UserSubscriptionUpsert) {
 		s.ClearNotes()
+	})
+}
+
+// SetAutoBalanceEnabled sets the "auto_balance_enabled" field.
+func (u *UserSubscriptionUpsertBulk) SetAutoBalanceEnabled(v bool) *UserSubscriptionUpsertBulk {
+	return u.Update(func(s *UserSubscriptionUpsert) {
+		s.SetAutoBalanceEnabled(v)
+	})
+}
+
+// UpdateAutoBalanceEnabled sets the "auto_balance_enabled" field to the value that was provided on create.
+func (u *UserSubscriptionUpsertBulk) UpdateAutoBalanceEnabled() *UserSubscriptionUpsertBulk {
+	return u.Update(func(s *UserSubscriptionUpsert) {
+		s.UpdateAutoBalanceEnabled()
 	})
 }
 

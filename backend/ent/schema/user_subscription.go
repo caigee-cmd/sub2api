@@ -84,6 +84,10 @@ func (UserSubscription) Fields() []ent.Field {
 			Optional().
 			Nillable().
 			SchemaType(map[string]string{dialect.Postgres: "text"}),
+
+		// auto_balance_enabled 控制订阅额度超限/到期后是否自动降级为余额计费
+		field.Bool("auto_balance_enabled").
+			Default(true),
 	}
 }
 

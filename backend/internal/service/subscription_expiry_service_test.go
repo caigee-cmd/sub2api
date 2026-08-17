@@ -87,6 +87,10 @@ func (r *subscriptionExpiryRepoStub) UpdateNotes(context.Context, int64, string)
 	return nil
 }
 
+func (r *subscriptionExpiryRepoStub) UpdateAutoBalance(context.Context, int64, bool) error {
+	return nil
+}
+
 func (r *subscriptionExpiryRepoStub) ActivateWindows(context.Context, int64, time.Time, time.Time) error {
 	return nil
 }

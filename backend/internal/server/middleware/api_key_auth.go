@@ -202,10 +202,15 @@ func apiKeyAuthWithSubscription(apiKeyService *service.APIKeyService, subscripti
 			)
 			if subErr != nil {
 				if !skipBilling {
-					AbortWithError(c, 403, "SUBSCRIPTION_NOT_FOUND", "No active subscription found for this group")
-					return
+					// 自动余额降级：订阅过期/不存在时，若用户开启且余额充足，
+					// 放行并保持 subscription 为 nil，下游自动按余额计费。
+					if !subscriptionService.CheckAutoBalanceFallback(c.Request.Context(), apiKey.User.ID, apiKey.Group.ID) ||
+						apiKeyBalanceBelowAuthThreshold(apiKey.User.Balance, cfg) {
+						AbortWithError(c, 403, "SUBSCRIPTION_NOT_FOUND", "No active subscription found for this group")
+						return
+					}
 				}
-				// skipBilling: 订阅不存在也放行，handler 会返回可用的数据
+				// skipBilling 或余额降级放行：subscription 保持 nil，handler 返回可用数据/按余额计费
 			} else {
 				subscription = sub
 			}
@@ -247,16 +252,23 @@ func apiKeyAuthWithSubscription(apiKeyService *service.APIKeyService, subscripti
 					_, validateErr = subscriptionService.ValidateAndCheckLimits(subscription, apiKey.Group)
 				}
 				if validateErr != nil {
-					code := "SUBSCRIPTION_INVALID"
-					status := 403
-					if errors.Is(validateErr, service.ErrDailyLimitExceeded) ||
-						errors.Is(validateErr, service.ErrWeeklyLimitExceeded) ||
-						errors.Is(validateErr, service.ErrMonthlyLimitExceeded) {
-						code = "USAGE_LIMIT_EXCEEDED"
-						status = 429
+					// 自动余额降级：额度超限或订阅过期时，若用户开启且余额充足，
+					// 置空 subscription 继续放行，下游自动按余额计费。
+					if subscription.AutoBalanceEnabled &&
+						!apiKeyBalanceBelowAuthThreshold(apiKey.User.Balance, cfg) {
+						subscription = nil
+					} else {
+						code := "SUBSCRIPTION_INVALID"
+						status := 403
+						if errors.Is(validateErr, service.ErrDailyLimitExceeded) ||
+							errors.Is(validateErr, service.ErrWeeklyLimitExceeded) ||
+							errors.Is(validateErr, service.ErrMonthlyLimitExceeded) {
+							code = "USAGE_LIMIT_EXCEEDED"
+							status = 429
+						}
+						AbortWithError(c, status, code, validateErr.Error())
+						return
 					}
-					AbortWithError(c, status, code, validateErr.Error())
-					return
 				}
 			} else {
 				// 非订阅模式 或 订阅模式但 subscriptionService 未注入：回退到余额检查
