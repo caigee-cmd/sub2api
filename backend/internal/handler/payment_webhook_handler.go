@@ -164,8 +164,25 @@ func extractOutTradeNo(rawBody, providerKey string) string {
 		if err := json.Unmarshal([]byte(rawBody), &payload); err == nil {
 			return strings.TrimSpace(payload.Data.Object.MerchantOrderID)
 		}
+	case payment.TypeStripe:
+		// Stripe webhooks carry the order ID in payment_intent.metadata.orderId
+		// (set during CreatePayment). Extracting it here lets the webhook handler
+		// resolve the correct provider instance when multiple Stripe instances
+		// exist (e.g. separate card and WeChat Pay instances).
+		var payload struct {
+			Data struct {
+				Object struct {
+					Metadata struct {
+						OrderID string `json:"orderId"`
+					} `json:"metadata"`
+				} `json:"object"`
+			} `json:"data"`
+		}
+		if err := json.Unmarshal([]byte(rawBody), &payload); err == nil {
+			return strings.TrimSpace(payload.Data.Object.Metadata.OrderID)
+		}
 	}
-	// For other providers (Stripe, Alipay direct, WxPay direct), the registry
+	// For other providers (Alipay direct, WxPay direct), the registry
 	// typically has only one instance, so no instance lookup is needed.
 	return ""
 }
