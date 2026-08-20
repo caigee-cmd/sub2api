@@ -440,9 +440,10 @@ func (s *SettingService) GetAvailableChannelsRuntime(ctx context.Context) Availa
 // ModelPlazaRuntime is the lightweight view of the model-plaza feature consumed
 // by the public plaza handler.
 type ModelPlazaRuntime struct {
-	Enabled     bool
-	RequireAuth bool
-	Description string
+	Enabled         bool
+	RequireAuth     bool
+	Description     string
+	OfficialPricing map[string]*PlazaOfficialPricing
 }
 
 // GetModelPlazaRuntime reads the model-plaza feature switches directly from the
@@ -453,15 +454,55 @@ func (s *SettingService) GetModelPlazaRuntime(ctx context.Context) ModelPlazaRun
 		SettingKeyModelPlazaEnabled,
 		SettingKeyModelPlazaRequireAuth,
 		SettingKeyModelPlazaDescription,
+		SettingKeyModelPlazaOfficialPricing,
 	})
 	if err != nil {
 		return ModelPlazaRuntime{Enabled: false}
 	}
-	return ModelPlazaRuntime{
+	runtime := ModelPlazaRuntime{
 		Enabled:     vals[SettingKeyModelPlazaEnabled] == "true",
 		RequireAuth: vals[SettingKeyModelPlazaRequireAuth] == "true",
 		Description: vals[SettingKeyModelPlazaDescription],
 	}
+	runtime.OfficialPricing = parseModelPlazaOfficialPricing(
+		vals[SettingKeyModelPlazaOfficialPricing],
+	)
+	return runtime
+}
+
+type plazaOfficialPricingSetting struct {
+	InputPrice        *float64 `json:"input_price"`
+	OutputPrice       *float64 `json:"output_price"`
+	CacheWritePrice   *float64 `json:"cache_write_price"`
+	CacheWrite1hPrice *float64 `json:"cache_write_1h_price"`
+	CacheReadPrice    *float64 `json:"cache_read_price"`
+}
+
+func parseModelPlazaOfficialPricing(raw string) map[string]*PlazaOfficialPricing {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return nil
+	}
+	var decoded map[string]*plazaOfficialPricingSetting
+	if err := json.Unmarshal([]byte(raw), &decoded); err != nil {
+		slog.Warn("invalid model plaza official pricing setting", "error", err)
+		return nil
+	}
+	overrides := make(map[string]*PlazaOfficialPricing, len(decoded))
+	for model, pricing := range decoded {
+		if pricing == nil {
+			overrides[model] = nil
+			continue
+		}
+		overrides[model] = &PlazaOfficialPricing{
+			InputPrice:        pricing.InputPrice,
+			OutputPrice:       pricing.OutputPrice,
+			CacheWritePrice:   pricing.CacheWritePrice,
+			CacheWrite1hPrice: pricing.CacheWrite1hPrice,
+			CacheReadPrice:    pricing.CacheReadPrice,
+		}
+	}
+	return overrides
 }
 
 // IsUserErrorViewAllowed reads the user-facing error-requests visibility switch

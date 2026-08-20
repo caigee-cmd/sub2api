@@ -187,3 +187,20 @@ func TestSettingService_GetPublicSettings_FallsBackToConfigForWeChatOAuthCapabil
 	require.False(t, settings.WeChatOAuthMPEnabled)
 	require.False(t, settings.WeChatOAuthMobileEnabled)
 }
+
+func TestSettingService_GetModelPlazaRuntime_ParsesOfficialPricingOverrides(t *testing.T) {
+	repo := &settingPublicRepoStub{
+		values: map[string]string{
+			SettingKeyModelPlazaEnabled:         "true",
+			SettingKeyModelPlazaOfficialPricing: `{"glm-5.3":{"input_price":0.0000014,"output_price":0.0000044}}`,
+		},
+	}
+	svc := NewSettingService(repo, &config.Config{})
+
+	runtime := svc.GetModelPlazaRuntime(context.Background())
+
+	require.True(t, runtime.Enabled)
+	require.Contains(t, runtime.OfficialPricing, "glm-5.3")
+	require.InDelta(t, 1.4e-6, *runtime.OfficialPricing["glm-5.3"].InputPrice, 1e-12)
+	require.InDelta(t, 4.4e-6, *runtime.OfficialPricing["glm-5.3"].OutputPrice, 1e-12)
+}

@@ -126,7 +126,7 @@ func (h *ModelPlazaHandler) Get(c *gin.Context) {
 
 	out := make([]modelPlazaGroup, 0, len(visible))
 	for i := range visible {
-		out = append(out, toModelPlazaGroupDTO(&visible[i], userRates))
+		out = append(out, toModelPlazaGroupDTO(&visible[i], userRates, rt.OfficialPricing))
 	}
 	response.Success(c, modelPlazaResponse{
 		Description: rt.Description,
@@ -156,15 +156,23 @@ func filterPlazaVisibleGroups(
 }
 
 // toModelPlazaGroupDTO 将 service 层广场分组映射为白名单 DTO,并合并用户专属倍率。
-func toModelPlazaGroupDTO(g *service.PlazaGroup, userRates map[int64]float64) modelPlazaGroup {
+func toModelPlazaGroupDTO(
+	g *service.PlazaGroup,
+	userRates map[int64]float64,
+	officialPricingOverrides map[string]*service.PlazaOfficialPricing,
+) modelPlazaGroup {
 	models := make([]modelPlazaModel, 0, len(g.Models))
 	for i := range g.Models {
 		m := &g.Models[i]
+		officialPricing := m.OfficialPricing
+		if override, ok := officialPricingOverrides[m.Name]; ok {
+			officialPricing = override
+		}
 		models = append(models, modelPlazaModel{
 			Name:            m.Name,
 			Platform:        m.Platform,
 			Pricing:         toUserPricing(m.Pricing),
-			OfficialPricing: toModelPlazaOfficialPricing(m.OfficialPricing),
+			OfficialPricing: toModelPlazaOfficialPricing(officialPricing),
 		})
 	}
 	dto := modelPlazaGroup{

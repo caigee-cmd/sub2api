@@ -416,6 +416,10 @@ const (
 	// the Model Plaza page (global pricing notes, exchange rate, promotions, ...).
 	SettingKeyModelPlazaDescription = "model_plaza_description"
 
+	// SettingKeyModelPlazaOfficialPricing stores display-only official price
+	// overrides for models missing from the LiteLLM catalog.
+	SettingKeyModelPlazaOfficialPricing = "model_plaza_official_pricing"
+
 	// SettingKeyUpstreamBillingProbeSettings stores the global enable switch and interval
 	// for probing remote Sub2API API-key billing metadata.
 	SettingKeyUpstreamBillingProbeSettings = "upstream_billing_probe_settings"

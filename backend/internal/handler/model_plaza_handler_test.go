@@ -81,7 +81,7 @@ func TestToModelPlazaGroupDTO_UserRateAndFieldWhitelist(t *testing.T) {
 	}
 
 	// 有专属倍率:user_rate_multiplier 序列化输出
-	dto := toModelPlazaGroupDTO(&g, map[int64]float64{2: 0.5})
+	dto := toModelPlazaGroupDTO(&g, map[int64]float64{2: 0.5}, nil)
 	raw, err := json.Marshal(dto)
 	require.NoError(t, err)
 	var decoded map[string]any
@@ -111,7 +111,24 @@ func TestToModelPlazaGroupDTO_UserRateAndFieldWhitelist(t *testing.T) {
 	require.False(t, has1h, "1h 缓存写价为 nil 时应 omitempty")
 
 	// 无专属倍率:user_rate_multiplier 整个字段省略
-	dtoNoRate := toModelPlazaGroupDTO(&g, nil)
+	officialOverride := &service.PlazaOfficialPricing{
+		InputPrice:  testPtr(2e-6),
+		OutputPrice: testPtr(8e-6),
+	}
+	dtoOverride := toModelPlazaGroupDTO(
+		&g,
+		map[int64]float64{2: 0.5},
+		map[string]*service.PlazaOfficialPricing{"claude-sonnet": officialOverride},
+	)
+	rawOverride, err := json.Marshal(dtoOverride)
+	require.NoError(t, err)
+	var decodedOverride map[string]any
+	require.NoError(t, json.Unmarshal(rawOverride, &decodedOverride))
+	overrideModel := decodedOverride["models"].([]any)[0].(map[string]any)["official_pricing"].(map[string]any)
+	require.InDelta(t, 2e-6, overrideModel["input_price"].(float64), 1e-12)
+	require.InDelta(t, 8e-6, overrideModel["output_price"].(float64), 1e-12)
+
+	dtoNoRate := toModelPlazaGroupDTO(&g, nil, nil)
 	rawNoRate, err := json.Marshal(dtoNoRate)
 	require.NoError(t, err)
 	var decodedNoRate map[string]any
