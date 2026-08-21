@@ -1672,7 +1672,6 @@ func TestBufferedResponseAccumulator_IgnoresNonFunctionCallItems(t *testing.T) {
 	assert.False(t, acc.HasContent())
 }
 
-
 func TestChatCompletionsResponseToResponses_StripReasoningHidesFallbackText(t *testing.T) {
 	resp := &ChatCompletionsResponse{
 		Choices: []ChatChoice{{

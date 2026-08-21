@@ -436,7 +436,8 @@ func extractAnthropicTextFromBlocks(blocks []AnthropicContentBlock) string {
 //	max    -> xhigh
 func mapAnthropicEffortToResponses(effort string) string {
 	if effort == "max" {
-		return "xhigh"
+		// Most OpenAI-compatible upstreams only accept {low, medium, high}.
+		return "high"
 	}
 	return effort // low→low, medium→medium, high→high, unknown→passthrough
 }
