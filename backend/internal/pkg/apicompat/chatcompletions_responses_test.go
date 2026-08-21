@@ -1671,3 +1671,45 @@ func TestBufferedResponseAccumulator_IgnoresNonFunctionCallItems(t *testing.T) {
 
 	assert.False(t, acc.HasContent())
 }
+
+
+func TestChatCompletionsResponseToResponses_StripReasoningHidesFallbackText(t *testing.T) {
+	resp := &ChatCompletionsResponse{
+		Choices: []ChatChoice{{
+			Message: ChatMessage{
+				Role:             "assistant",
+				ReasoningContent: "hidden thinking",
+			},
+		}},
+	}
+
+	out := ChatCompletionsResponseToResponses(resp, "qwen3-max", nil, false, nil, true)
+	require.NotNil(t, out)
+	require.Len(t, out.Output, 1)
+	assert.Equal(t, "message", out.Output[0].Type)
+	require.Len(t, out.Output[0].Content, 1)
+	assert.Empty(t, out.Output[0].Content[0].Text)
+}
+
+func TestFinalizeChatCompletionsResponsesStream_StripReasoningSkipsFallbackMessage(t *testing.T) {
+	state := NewChatCompletionsToResponsesStreamState("qwen3-max")
+	state.StripReasoning = true
+	_, _ = state.Reasoning.WriteString("hidden thinking")
+
+	events := FinalizeChatCompletionsResponsesStream(state)
+	for _, event := range events {
+		assert.NotEqual(t, "response.output_text.delta", event.Type)
+		if event.Item != nil {
+			assert.NotEqual(t, "message", event.Item.Type)
+		}
+		if event.Response != nil {
+			for _, item := range event.Response.Output {
+				assert.NotEqual(t, "reasoning", item.Type)
+				if item.Type == "message" {
+					require.NotEmpty(t, item.Content)
+					assert.Empty(t, item.Content[0].Text)
+				}
+			}
+		}
+	}
+}

@@ -1176,7 +1176,8 @@ func chatMessageToResponsesOutput(message ChatMessage, customTools map[string]bo
 	}
 
 	text := chatMessageContentText(message.Content)
-	if text == "" && strings.TrimSpace(reasoning) != "" && len(message.ToolCalls) == 0 {
+	// Skipped when stripReasoning is set (the reasoning is intentionally hidden).
+	if !stripReasoning && text == "" && strings.TrimSpace(reasoning) != "" && len(message.ToolCalls) == 0 {
 		text = reasoning
 	}
 	if text != "" || len(message.ToolCalls) == 0 {
@@ -1674,6 +1675,7 @@ func closeChatReasoningItem(state *ChatCompletionsToResponsesStreamState) []Resp
 
 func synthesizeChatReasoningFallbackMessage(state *ChatCompletionsToResponsesStreamState) []ResponsesStreamEvent {
 	if state == nil ||
+		state.StripReasoning ||
 		state.MessageItemID != "" ||
 		state.Text.Len() > 0 ||
 		state.Reasoning.Len() == 0 ||
