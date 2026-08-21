@@ -29,6 +29,8 @@ const (
 	FieldPingLatencyMs = "ping_latency_ms"
 	// FieldMessage holds the string denoting the message field in the database.
 	FieldMessage = "message"
+	// FieldQuota holds the string denoting the quota field in the database.
+	FieldQuota = "quota"
 	// FieldCheckedAt holds the string denoting the checked_at field in the database.
 	FieldCheckedAt = "checked_at"
 	// EdgeMonitor holds the string denoting the monitor edge name in mutations.
@@ -54,6 +56,7 @@ var Columns = []string{
 	FieldFirstTokenLatencyMs,
 	FieldPingLatencyMs,
 	FieldMessage,
+	FieldQuota,
 	FieldCheckedAt,
 }
 

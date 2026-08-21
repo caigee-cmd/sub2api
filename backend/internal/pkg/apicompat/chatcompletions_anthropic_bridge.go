@@ -444,11 +444,12 @@ const ccAnthropicDummySignature = "sub2api-cc-bridge"
 
 func chatMessageToAnthropicBlocks(message ChatMessage, stripReasoning bool) []AnthropicContentBlock {
 	var blocks []AnthropicContentBlock
+	reasoning := message.reasoningText()
 
-	if !stripReasoning && message.ReasoningContent != "" {
+	if !stripReasoning && reasoning != "" {
 		blocks = append(blocks, AnthropicContentBlock{
 			Type:      "thinking",
-			Thinking:  message.ReasoningContent,
+			Thinking:  reasoning,
 			Signature: ccAnthropicDummySignature,
 		})
 	}
@@ -457,8 +458,8 @@ func chatMessageToAnthropicBlocks(message ChatMessage, stripReasoning bool) []An
 	// DeepSeek reasoning-only fallback: when there is no text and no tool calls,
 	// surface the reasoning content as visible text so the turn isn't empty.
 	// Skipped when stripReasoning is set (the reasoning is intentionally hidden).
-	if !stripReasoning && text == "" && strings.TrimSpace(message.ReasoningContent) != "" && len(message.ToolCalls) == 0 {
-		text = message.ReasoningContent
+	if !stripReasoning && text == "" && strings.TrimSpace(reasoning) != "" && len(message.ToolCalls) == 0 {
+		text = reasoning
 	}
 	// Qwen XML tool-call leak: strip internal markup that escaped into text.
 	text = StripQwenXMLToolCallTags(text)
@@ -643,11 +644,12 @@ func ChatCompletionsChunkToAnthropicEvents(
 
 	for _, choice := range chunk.Choices {
 		// Reasoning content → thinking block (skipped when StripReasoning is set).
-		if !state.StripReasoning && choice.Delta.ReasoningContent != nil && *choice.Delta.ReasoningContent != "" {
+		reasoning := choice.Delta.reasoningText()
+		if !state.StripReasoning && reasoning != nil && *reasoning != "" {
 			events = append(events, ensureCCAnthropicThinkingBlock(state)...)
 			events = append(events, ccAnthropicDelta(state, &AnthropicDelta{
 				Type:     "thinking_delta",
-				Thinking: *choice.Delta.ReasoningContent,
+				Thinking: *reasoning,
 			})...)
 		}
 

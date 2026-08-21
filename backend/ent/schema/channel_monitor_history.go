@@ -9,6 +9,8 @@ import (
 	"entgo.io/ent/schema/edge"
 	"entgo.io/ent/schema/field"
 	"entgo.io/ent/schema/index"
+
+	"github.com/Wei-Shaw/sub2api/internal/domain"
 )
 
 // ChannelMonitorHistory holds the schema definition for the ChannelMonitorHistory entity.
@@ -46,6 +48,8 @@ func (ChannelMonitorHistory) Fields() []ent.Field {
 			Optional().
 			Default("").
 			MaxLen(500),
+		field.JSON("quota", &domain.MonitorQuotaSnapshot{}).
+			Optional(),
 		field.Time("checked_at").
 			Default(time.Now),
 	}

@@ -205,6 +205,8 @@ func buildStatusSummary(
 			summary.PrimaryStatus = l.Status
 			summary.PrimaryLatencyMs = l.LatencyMs
 			summary.PrimaryFirstTokenMs = l.FirstTokenMs
+			// 配额快照只挂主模型行（quota 模式唯一行 / quota_probe 的主行）。
+			summary.LatestQuota = l.Quota
 		}
 		if a, ok := availByModel[primary]; ok {
 			summary.Availability7d = a.AvailabilityPct
@@ -245,6 +247,7 @@ func buildUserViewFromSummary(
 	}
 	if primaryLatest != nil {
 		view.PrimaryPingLatencyMs = primaryLatest.PingLatencyMs
+		view.LatestQuota = primaryLatest.Quota
 	}
 	return view
 }

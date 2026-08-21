@@ -246,7 +246,7 @@ func TestHelperFunctionsCoverage(t *testing.T) {
 
 	require.True(t, isTokenEvent("response.output_text.delta"))
 	require.True(t, isTokenEvent("response.output_audio.delta"))
-	require.True(t, isTokenEvent("response.completed"))
+	require.False(t, isTokenEvent("response.completed"))
 	require.False(t, isTokenEvent(""))
 	require.False(t, isTokenEvent("response.created"))
 
@@ -322,6 +322,29 @@ func TestParseUsageAndEnrichCoverage(t *testing.T) {
 	parseUsageAndAccumulate(state, []byte(`{"type":"response.in_progress","response":{"usage":{"input_tokens":9}}}`), "response.in_progress", nil)
 	require.Equal(t, 2, state.usage.InputTokens)
 	enrichResult(nil, state, 0)
+}
+
+func TestParseUsageAndAccumulateIncludesIndependentReasoningTokens(t *testing.T) {
+	t.Parallel()
+
+	state := &relayState{}
+	got := parseUsageAndAccumulate(
+		state,
+		[]byte(`{"type":"response.completed","response":{"usage":{"input_tokens":32,"output_tokens":9,"total_tokens":151,"output_tokens_details":{"reasoning_tokens":110}}}}`),
+		"response.completed",
+		nil,
+	)
+	require.Equal(t, 32, got.InputTokens)
+	require.Equal(t, 119, got.OutputTokens)
+
+	state = &relayState{}
+	got = parseUsageAndAccumulate(
+		state,
+		[]byte(`{"type":"response.completed","response":{"usage":{"input_tokens":32,"output_tokens":119,"total_tokens":151,"output_tokens_details":{"reasoning_tokens":110}}}}`),
+		"response.completed",
+		nil,
+	)
+	require.Equal(t, 119, got.OutputTokens, "inclusive Responses output must not double-count reasoning")
 }
 
 func TestParseUsageAndAccumulateAcceptsChatUsageAliases(t *testing.T) {
@@ -407,8 +430,32 @@ func TestIsTokenEventCoverageBranches(t *testing.T) {
 	require.False(t, isTokenEvent("response.in_progress"))
 	require.False(t, isTokenEvent("response.output_item.added"))
 	require.True(t, isTokenEvent("response.output_audio.delta"))
-	require.True(t, isTokenEvent("response.output"))
-	require.True(t, isTokenEvent("response.done"))
+	require.True(t, isTokenEvent("response.function_call_arguments.delta"))
+	require.True(t, isTokenEvent("response.reasoning_summary_text.delta"))
+	require.True(t, isTokenEvent("response.output_text.done"))
+	require.True(t, isTokenEvent("response.function_call_arguments.done"))
+	require.False(t, isTokenEvent("response.output"))
+	require.False(t, isTokenEvent("response.output_audio.done"))
+	require.False(t, isTokenEvent("response.content_part.done"))
+	require.False(t, isTokenEvent("response.output_item.done"))
+	require.False(t, isTokenEvent("response.output_text.annotation.added"))
+	require.False(t, isTokenEvent("response.done"))
+}
+
+func TestTerminalAndTokenEventSetsAreDisjoint(t *testing.T) {
+	t.Parallel()
+
+	for _, eventType := range []string{
+		"response.completed",
+		"response.done",
+		"response.failed",
+		"response.incomplete",
+		"response.cancelled",
+		"response.canceled",
+	} {
+		require.True(t, isTerminalEvent(eventType), eventType)
+		require.False(t, isTokenEvent(eventType), eventType)
+	}
 }
 
 func TestShouldParseUsageTerminalEvents(t *testing.T) {

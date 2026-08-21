@@ -114,8 +114,9 @@ func isGrokAccountAccessCode(value string) bool {
 		"subscription_required",
 		"entitlement_required",
 		"not_entitled",
-		"plan_required",
-		"permission_denied":
+		"plan_required":
+		// permission-denied is omitted: xAI reuses it for both entitlement
+		// refusals and request-scoped safety blocks, so the message decides.
 		return true
 	default:
 		return false
@@ -171,6 +172,7 @@ func grokContentPolicyMessage(value string) bool {
 		"prompt violates policy",
 		"input violates content policy",
 		"input violates policy",
+		"violates usage guidelines",
 	} {
 		if strings.Contains(lower, phrase) {
 			return true
@@ -191,9 +193,16 @@ func grokContentPolicyClientMessage(responseBody []byte) string {
 // shouldFailoverGrokUpstreamError is the body-aware counterpart of the
 // status-only failover helper. Grok content refusals must stay on the current
 // account and be returned to the caller instead of consuming the account pool.
+// Free-usage / empty-output / billing bodies also failover even when the HTTP
+// status alone would not (e.g. 400 with free-usage-exhausted).
 func (s *OpenAIGatewayService) shouldFailoverGrokUpstreamError(statusCode int, responseBody []byte) bool {
 	if isGrokContentPolicyRejection(statusCode, responseBody) {
 		return false
+	}
+	decision := classifyGrokUpstreamFailure(statusCode, responseBody, "")
+	switch decision.Class {
+	case GrokFailureFreeUsage, GrokFailureEmptyUpstream, GrokFailureBilling, GrokFailureModelCapacity, GrokFailureCompatibility:
+		return decision.ShouldFailover
 	}
 	return s.shouldFailoverUpstreamError(statusCode)
 }
