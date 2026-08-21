@@ -24,7 +24,7 @@ func TestNormalizeOpenAIReasoningEffortForGPT56(t *testing.T) {
 		{name: "Sol 保留 max", raw: "max", model: "gpt-5.6-sol", want: "max"},
 		{name: "Terra 保留 max", raw: "max", model: "openai/gpt-5.6-terra", want: "max"},
 		{name: "Luna 后缀保留 max", raw: "max", model: "gpt-5.6-luna-2026-07-09", want: "max"},
-		{name: "其他模型沿用 xhigh", raw: "max", model: "deepseek-v4-pro", want: "xhigh"},
+		{name: "其他模型沿用 high", raw: "max", model: "deepseek-v4-pro", want: "high"},
 	}
 
 	for _, tt := range tests {
@@ -42,7 +42,7 @@ func TestNormalizeOpenAICodexCompactReasoningEffortDowngradesMax(t *testing.T) {
 	require.NoError(t, err)
 	require.True(t, changed)
 	require.Equal(t, "gpt-5.6-sol", gjson.GetBytes(normalized, "model").String())
-	require.Equal(t, "xhigh", gjson.GetBytes(normalized, "reasoning.effort").String())
+	require.Equal(t, "high", gjson.GetBytes(normalized, "reasoning.effort").String())
 	require.Equal(t, "auto", gjson.GetBytes(normalized, "reasoning.summary").String())
 }
 
@@ -62,7 +62,7 @@ func TestNormalizeOpenAICodexCompactReasoningEffortForAccountScopesCompatibility
 			path:    "/openai/v1/responses/compact",
 			account: &Account{Platform: PlatformOpenAI, Type: AccountTypeOAuth},
 			changed: true,
-			want:    "xhigh",
+			want:    "high",
 		},
 		{
 			name:    "OpenAI OAuth 普通请求保留",
@@ -218,9 +218,9 @@ func TestOpenAIGatewayServiceForwardOAuthCompactDowngradesMaxEffort(t *testing.T
 	require.NotNil(t, result)
 	require.NotNil(t, upstream.lastReq)
 	require.Equal(t, chatgptCodexURL+"/compact", upstream.lastReq.URL.String())
-	require.Equal(t, "xhigh", gjson.GetBytes(upstream.lastBody, "reasoning.effort").String())
+	require.Equal(t, "high", gjson.GetBytes(upstream.lastBody, "reasoning.effort").String())
 	require.NotNil(t, result.ReasoningEffort)
-	require.Equal(t, "xhigh", *result.ReasoningEffort)
+	require.Equal(t, "high", *result.ReasoningEffort)
 }
 
 func TestOpenAIGatewayServiceForwardOAuthRemoteCompactV2PreservesResponsesWire(t *testing.T) {

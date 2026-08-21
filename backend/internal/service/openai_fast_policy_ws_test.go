@@ -1087,7 +1087,7 @@ func TestPassthroughUsageMeta_TracksReasoningEffortAcrossTurns(t *testing.T) {
 	require.NoError(t, errFlat)
 	require.Nil(t, blockedFlat)
 	require.NotNil(t, meta.reasoningEffort.Load())
-	require.Equal(t, "xhigh", *meta.reasoningEffort.Load(), "flat reasoning_effort 必须进入 passthrough usage metadata")
+	require.Equal(t, "high", *meta.reasoningEffort.Load(), "flat reasoning_effort 必须进入 passthrough usage metadata")
 
 	_, blockedClear, errClear := process([]byte(`{"type":"response.create","model":"gpt-4o"}`))
 	require.NoError(t, errClear)

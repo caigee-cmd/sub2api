@@ -223,10 +223,10 @@ func TestForwardAsAnthropic_NormalizesRoutingAndEffortForGpt54XHigh(t *testing.T
 	require.Equal(t, "gpt-5.4", result.UpstreamModel)
 	require.Equal(t, "gpt-5.4", result.BillingModel)
 	require.NotNil(t, result.ReasoningEffort)
-	require.Equal(t, "xhigh", *result.ReasoningEffort)
+	require.Equal(t, "high", *result.ReasoningEffort)
 
 	require.Equal(t, "gpt-5.4", gjson.GetBytes(upstream.lastBody, "model").String())
-	require.Equal(t, "xhigh", gjson.GetBytes(upstream.lastBody, "reasoning.effort").String())
+	require.Equal(t, "high", gjson.GetBytes(upstream.lastBody, "reasoning.effort").String())
 	require.Equal(t, http.StatusOK, rec.Code)
 	require.Equal(t, "gpt-5.4-xhigh", gjson.GetBytes(rec.Body.Bytes(), "model").String())
 	require.Equal(t, "ok", gjson.GetBytes(rec.Body.Bytes(), "content.0.text").String())
@@ -266,12 +266,12 @@ func TestForwardAsAnthropic_PreservesMaxForFinalGPT56ResponsesModel(t *testing.T
 			wantEffort:    "max",
 		},
 		{
-			name:       "old model still maps max to xhigh",
+			name:       "old model still maps max to high",
 			account:    rawGPT56ResponsesAPIKeyAccount("gpt-5.5", "gpt-5.5"),
 			model:      "gpt-5.5",
 			effort:     "max",
 			wantModel:  "gpt-5.5",
-			wantEffort: "xhigh",
+			wantEffort: "high",
 		},
 		{
 			name:       "GPT56 default remains medium",

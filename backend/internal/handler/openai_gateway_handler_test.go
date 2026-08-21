@@ -1380,7 +1380,7 @@ func TestOpenAIResponsesWebSocket_PassthroughUsageLogInfersReasoningFromInitialR
 	require.Equal(t, "gpt-5.4", gjson.GetBytes(got.upstreamFirstPayload, "model").String(),
 		"上游首帧应使用渠道映射后的模型")
 	require.NotNil(t, got.log.ReasoningEffort)
-	require.Equal(t, "xhigh", *got.log.ReasoningEffort,
+	require.Equal(t, "high", *got.log.ReasoningEffort,
 		"usage log reasoning effort 必须使用渠道映射前首帧模型后缀推导")
 }
 

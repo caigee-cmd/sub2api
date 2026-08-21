@@ -375,10 +375,9 @@ func normalizeOpenAICodexCompactReasoningEffort(body []byte, effectiveModel stri
 		return body, false, nil
 	}
 
-	// Codex Ultra 在客户端编排层会下发 max；ChatGPT compact 端点目前只接受到
-	// xhigh。这里只降级 OpenAI OAuth 的 GPT-5.6 compact 子请求，普通 Responses、
-	// API Key 请求和其他平台的 OAuth 请求保留 max。
-	normalized, err := sjson.SetBytes(body, "reasoning.effort", "xhigh")
+	// Codex Ultra 在客户端编排层会下发 max。Custom fork clamps OpenAI-compatible
+	// effort to {low,medium,high}, so compact also downgrades to high.
+	normalized, err := sjson.SetBytes(body, "reasoning.effort", "high")
 	if err != nil {
 		return body, false, fmt.Errorf("normalize codex compact reasoning effort: %w", err)
 	}
