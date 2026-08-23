@@ -4,7 +4,10 @@
 // formats can be served through a unified gateway.
 package apicompat
 
-import "encoding/json"
+import (
+	"bytes"
+	"encoding/json"
+)
 
 // ---------------------------------------------------------------------------
 // Anthropic Messages API types
@@ -112,7 +115,7 @@ type AnthropicTool struct {
 	Type         string                 `json:"type,omitempty"` // e.g. "web_search_20250305" for server tools
 	Name         string                 `json:"name"`
 	Description  string                 `json:"description,omitempty"`
-	InputSchema  json.RawMessage        `json:"input_schema"` // JSON Schema object
+	InputSchema  json.RawMessage        `json:"input_schema,omitempty"` // JSON Schema object
 	CacheControl *AnthropicCacheControl `json:"cache_control,omitempty"`
 }
 
@@ -260,19 +263,51 @@ type ResponsesInputItem struct {
 	ID        string `json:"id,omitempty"`
 
 	// type=function_call_output
-	Output string `json:"output,omitempty"`
+	Output    string `json:"output,omitempty"`
+	outputRaw json.RawMessage
+}
+
+func (i *ResponsesInputItem) UnmarshalJSON(data []byte) error {
+	type alias ResponsesInputItem
+	var wire struct {
+		*alias
+		Output json.RawMessage `json:"output"`
+	}
+
+	*i = ResponsesInputItem{}
+	wire.alias = (*alias)(i)
+	if err := json.Unmarshal(data, &wire); err != nil {
+		return err
+	}
+
+	output := bytes.TrimSpace(wire.Output)
+	if len(output) == 0 || bytes.Equal(output, []byte("null")) {
+		return nil
+	}
+	if err := json.Unmarshal(output, &i.Output); err == nil {
+		return nil
+	}
+
+	i.outputRaw = append(i.outputRaw[:0], output...)
+	i.Output = string(output)
+	return nil
 }
 
 // ResponsesContentPart is a typed content part in a Responses message.
 type ResponsesContentPart struct {
-	Type     string `json:"type"` // "input_text" | "output_text" | "input_image"
+	Type     string `json:"type"` // "input_text" | "output_text" | "input_image" | "input_file"
 	Text     string `json:"text,omitempty"`
 	ImageURL string `json:"image_url,omitempty"` // data URI for input_image
+
+	// input_file fields.
+	Filename string `json:"filename,omitempty"`
+	FileData string `json:"file_data,omitempty"` // data URI
+	FileID   string `json:"file_id,omitempty"`
 }
 
 // ResponsesTool describes a tool in the Responses API.
 type ResponsesTool struct {
-	Type        string          `json:"type"` // "function" | "custom" | "web_search" | "local_shell" etc.
+	Type        string          `json:"type"` // "function" | "custom" | "web_search" | "x_search" | "local_shell" etc.
 	Name        string          `json:"name,omitempty"`
 	Description string          `json:"description,omitempty"`
 	Parameters  json.RawMessage `json:"parameters,omitempty"`
@@ -281,6 +316,14 @@ type ResponsesTool struct {
 	// type=namespace 的子工具列表（tools 与 children 二选一，语义相同）。
 	Tools    []ResponsesTool `json:"tools,omitempty"`
 	Children []ResponsesTool `json:"children,omitempty"`
+
+	// type=x_search
+	AllowedXHandles          []string `json:"allowed_x_handles,omitempty"`
+	ExcludedXHandles         []string `json:"excluded_x_handles,omitempty"`
+	FromDate                 string   `json:"from_date,omitempty"`
+	ToDate                   string   `json:"to_date,omitempty"`
+	EnableImageUnderstanding *bool    `json:"enable_image_understanding,omitempty"`
+	EnableVideoUnderstanding *bool    `json:"enable_video_understanding,omitempty"`
 }
 
 // UnmarshalJSON 容忍字符串形式的工具声明：codex 会以 "name" 简写声明 custom 工具，
@@ -621,6 +664,7 @@ type ChatMessage struct {
 	Role             string          `json:"role"` // "system" | "user" | "assistant" | "tool" | "function"
 	Content          json.RawMessage `json:"content,omitempty"`
 	ReasoningContent string          `json:"reasoning_content,omitempty"`
+	Reasoning        string          `json:"reasoning,omitempty"`
 	Name             string          `json:"name,omitempty"`
 	ToolCalls        []ChatToolCall  `json:"tool_calls,omitempty"`
 	ToolCallID       string          `json:"tool_call_id,omitempty"`
@@ -631,9 +675,10 @@ type ChatMessage struct {
 
 // ChatContentPart is a typed content part in a multi-modal message.
 type ChatContentPart struct {
-	Type     string        `json:"type"` // "text" | "image_url"
+	Type     string        `json:"type"` // "text" | "image_url" | "file"
 	Text     string        `json:"text,omitempty"`
 	ImageURL *ChatImageURL `json:"image_url,omitempty"`
+	File     *ChatFile     `json:"file,omitempty"`
 }
 
 // ChatImageURL contains the URL for an image content part.
@@ -642,10 +687,25 @@ type ChatImageURL struct {
 	Detail string `json:"detail,omitempty"` // "auto" | "low" | "high"
 }
 
+// ChatFile contains the payload of a "file" content part (e.g. PDF input).
+type ChatFile struct {
+	Filename string `json:"filename,omitempty"`
+	FileData string `json:"file_data,omitempty"` // data URI
+	FileID   string `json:"file_id,omitempty"`
+}
+
 // ChatTool describes a tool available to the model.
 type ChatTool struct {
-	Type     string        `json:"type"` // "function"
+	Type     string        `json:"type"` // "function" | "x_search"
 	Function *ChatFunction `json:"function,omitempty"`
+
+	// type=x_search
+	AllowedXHandles          []string `json:"allowed_x_handles,omitempty"`
+	ExcludedXHandles         []string `json:"excluded_x_handles,omitempty"`
+	FromDate                 string   `json:"from_date,omitempty"`
+	ToDate                   string   `json:"to_date,omitempty"`
+	EnableImageUnderstanding *bool    `json:"enable_image_understanding,omitempty"`
+	EnableVideoUnderstanding *bool    `json:"enable_video_understanding,omitempty"`
 }
 
 // ChatFunction describes a function tool definition.
@@ -667,7 +727,9 @@ type ChatToolCall struct {
 
 // ChatFunctionCall contains the function name and arguments.
 type ChatFunctionCall struct {
-	Name      string `json:"name"`
+	// Empty name is omitted so streamed arguments-only deltas never overwrite
+	// the tool name a client accumulated from the first delta.
+	Name      string `json:"name,omitempty"`
 	Arguments string `json:"arguments"`
 }
 
@@ -741,7 +803,22 @@ type ChatDelta struct {
 	Role             string         `json:"role,omitempty"`
 	Content          *string        `json:"content,omitempty"` // pointer: omit when not present, null vs "" matters
 	ReasoningContent *string        `json:"reasoning_content,omitempty"`
+	Reasoning        *string        `json:"reasoning,omitempty"`
 	ToolCalls        []ChatToolCall `json:"tool_calls,omitempty"`
+}
+
+func (m ChatMessage) reasoningText() string {
+	if m.ReasoningContent != "" {
+		return m.ReasoningContent
+	}
+	return m.Reasoning
+}
+
+func (d ChatDelta) reasoningText() *string {
+	if d.ReasoningContent != nil {
+		return d.ReasoningContent
+	}
+	return d.Reasoning
 }
 
 // ---------------------------------------------------------------------------
