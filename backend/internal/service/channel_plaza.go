@@ -157,6 +157,9 @@ func (s *ChannelService) ListPlazaGroups(ctx context.Context) ([]PlazaGroup, err
 	out := make([]PlazaGroup, 0, len(order))
 	for _, gid := range order {
 		pg := byGroup[gid]
+		if g := groupEnt[gid]; g != nil {
+			pg.Models = filterPlazaModelsByAllowlist(pg.Models, g)
+		}
 		if len(pg.Models) == 0 {
 			continue
 		}
@@ -179,6 +182,33 @@ func (s *ChannelService) ListPlazaGroups(ctx context.Context) ([]PlazaGroup, err
 		return out[i].Name < out[j].Name
 	})
 	return out, nil
+}
+
+// filterPlazaModelsByAllowlist keeps only models present in the group's
+// models_list_config when that allowlist is enabled. Unconfigured groups keep
+// the full channel-aggregated catalog.
+func filterPlazaModelsByAllowlist(models []PlazaModel, g *Group) []PlazaModel {
+	if g == nil || !g.CustomModelsListEnabled() {
+		return models
+	}
+	allowed := make(map[string]struct{}, len(g.ModelsListConfig.Models))
+	for _, name := range g.ModelsListConfig.Models {
+		name = strings.TrimSpace(name)
+		if name == "" {
+			continue
+		}
+		allowed[strings.ToLower(name)] = struct{}{}
+	}
+	if len(allowed) == 0 {
+		return models
+	}
+	filtered := make([]PlazaModel, 0, len(models))
+	for _, model := range models {
+		if _, ok := allowed[strings.ToLower(model.Name)]; ok {
+			filtered = append(filtered, model)
+		}
+	}
+	return filtered
 }
 
 // plazaImageDisplayPricing 为图片计费模型合成展示定价，使档位价与实收口径一致：

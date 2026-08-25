@@ -328,3 +328,27 @@ func TestListPlazaGroups_RepoErrorsPropagate(t *testing.T) {
 	require.Nil(t, out2)
 	require.ErrorIs(t, err2, sentinel)
 }
+
+
+func TestListPlazaGroups_ModelsListConfigAllowlist(t *testing.T) {
+	// 启用 models_list_config 的分组只保留白名单内模型；未启用的分组保持渠道聚合全集。
+	ch := plazaPricedChannel(1, "ch", []int64{10, 20}, "openai", "gpt-5.6-sol", "gpt-5.5", "glm-5.3")
+	groups := []Group{
+		{
+			ID: 10, Name: "codex", Platform: "openai", RateMultiplier: 0.19,
+			ModelsListConfig: GroupModelsListConfig{Enabled: true, Models: []string{"gpt-5.6-sol", "gpt-5.5"}},
+		},
+		{ID: 20, Name: "open", Platform: "openai", RateMultiplier: 1},
+	}
+	out, err := newPlazaChannelService([]Channel{ch}, groups, nil).ListPlazaGroups(context.Background())
+	require.NoError(t, err)
+	require.Len(t, out, 2)
+	byName := map[string][]PlazaModel{}
+	for _, g := range out {
+		byName[g.Name] = g.Models
+	}
+	require.Len(t, byName["codex"], 2)
+	require.Equal(t, "gpt-5.5", byName["codex"][0].Name)
+	require.Equal(t, "gpt-5.6-sol", byName["codex"][1].Name)
+	require.Len(t, byName["open"], 3)
+}
