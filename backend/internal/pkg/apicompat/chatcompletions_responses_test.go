@@ -532,7 +532,7 @@ func TestChatCompletionsResponseToResponses_DeepSeekReasoningOnlyFallsBackToMess
 		}},
 	}
 
-	out := ChatCompletionsResponseToResponses(resp, "deepseek-reasoner", nil, false, nil, false)
+	out := ChatCompletionsResponseToResponses(resp, "deepseek-reasoner", nil, nil, false, nil, false)
 
 	require.Len(t, out.Output, 2)
 	require.Equal(t, "reasoning", out.Output[0].Type)
@@ -566,7 +566,7 @@ func TestChatCompletionsResponseToResponses_DeepSeekReasoningToolCallDoesNotFall
 		}},
 	}
 
-	out := ChatCompletionsResponseToResponses(resp, "deepseek-reasoner", nil, false, nil, false)
+	out := ChatCompletionsResponseToResponses(resp, "deepseek-reasoner", nil, nil, false, nil, false)
 
 	require.Len(t, out.Output, 2)
 	require.Equal(t, "reasoning", out.Output[0].Type)
@@ -1755,7 +1755,7 @@ func TestChatCompletionsResponseToResponses_StripReasoningHidesFallbackText(t *t
 		}},
 	}
 
-	out := ChatCompletionsResponseToResponses(resp, "qwen3-max", nil, false, nil, true)
+	out := ChatCompletionsResponseToResponses(resp, "qwen3-max", nil, nil, false, nil, true)
 	require.NotNil(t, out)
 	require.Len(t, out.Output, 1)
 	assert.Equal(t, "message", out.Output[0].Type)
