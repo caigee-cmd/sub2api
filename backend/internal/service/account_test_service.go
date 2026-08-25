@@ -3088,10 +3088,22 @@ func (s *AccountTestService) sendEvent(c *gin.Context, event TestEvent) {
 	c.Writer.Flush()
 }
 
-// sendErrorAndEnd sends an error event and ends the stream
+// sendErrorAndEnd sends an error event and ends the stream. The message is
+// assumed to originate from (or echo) upstream response text, so any embedded
+// URL is redacted to avoid leaking upstream base URLs to the client.
 func (s *AccountTestService) sendErrorAndEnd(c *gin.Context, errorMsg string) error {
 	log.Printf("Account test error: %s", errorMsg)
 	errorMsg = logredact.RedactUpstreamURL(errorMsg)
+	s.sendEvent(c, TestEvent{Type: "error", Error: errorMsg})
+	return fmt.Errorf("%s", errorMsg)
+}
+
+// sendLocalErrorAndEnd sends an error event for a locally-constructed,
+// user-facing message (e.g. configuration hints). It does not redact URLs,
+// which are intentionally included as actionable guidance rather than leaked
+// upstream details.
+func (s *AccountTestService) sendLocalErrorAndEnd(c *gin.Context, errorMsg string) error {
+	log.Printf("Account test error: %s", errorMsg)
 	s.sendEvent(c, TestEvent{Type: "error", Error: errorMsg})
 	return fmt.Errorf("%s", errorMsg)
 }

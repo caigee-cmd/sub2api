@@ -232,7 +232,7 @@ func (s *AccountTestService) testCNProviderAnthropicConnection(c *gin.Context, a
 		return s.sendErrorAndEnd(c, fmt.Sprintf("Invalid Anthropic base URL: %s", err.Error()))
 	}
 	if hint := cnAnthropicBaseURLMisconfigHint(baseURL); hint != "" {
-		return s.sendErrorAndEnd(c, hint)
+		return s.sendLocalErrorAndEnd(c, hint)
 	}
 	apiURL := strings.TrimRight(baseURL, "/") + "/v1/messages"
 
