@@ -1072,23 +1072,28 @@ func sanitizeGrokResponsesTools(body []byte) ([]byte, error) {
 	toolsChanged := false
 	for _, tool := range rawTools {
 		toolType := strings.TrimSpace(tool.Get("type").String())
-		if _, ok := grokResponsesSupportedToolTypes[toolType]; ok {
-			raw := json.RawMessage(tool.Raw)
-			if toolType == "function" && (!tool.Get("parameters").Exists() || tool.Get("parameters").Type == gjson.Null) {
-				var payload map[string]any
-				if err := decodeOpenAIJSONUseNumber(raw, &payload); err != nil {
-					return nil, err
-				}
-				payload["parameters"] = map[string]any{"type": "object", "properties": map[string]any{}}
-				encoded, err := marshalOpenAIUpstreamJSON(payload)
-				if err != nil {
-					return nil, err
-				}
-				raw = encoded
-				toolsChanged = true
-			}
-			filteredTools = append(filteredTools, raw)
+		if _, ok := grokResponsesSupportedToolTypes[toolType]; !ok {
+			continue
 		}
+		raw := json.RawMessage(tool.Raw)
+		if toolType == "function" && grokResponsesToolSchemaRejectedByUpstream(raw) {
+			toolsChanged = true
+			continue
+		}
+		if toolType == "function" && (!tool.Get("parameters").Exists() || tool.Get("parameters").Type == gjson.Null) {
+			var payload map[string]any
+			if err := decodeOpenAIJSONUseNumber(raw, &payload); err != nil {
+				return nil, err
+			}
+			payload["parameters"] = map[string]any{"type": "object", "properties": map[string]any{}}
+			encoded, err := marshalOpenAIUpstreamJSON(payload)
+			if err != nil {
+				return nil, err
+			}
+			raw = encoded
+			toolsChanged = true
+		}
+		filteredTools = append(filteredTools, raw)
 	}
 	if !grokRawToolsContainType(filteredTools, "tool_search") {
 		for index, raw := range filteredTools {
@@ -1144,6 +1149,32 @@ func grokRawToolsContainType(tools []json.RawMessage, want string) bool {
 		}
 	}
 	return false
+}
+
+// grokResponsesToolSchemaRejectedByUpstream reports whether a function tool's
+// parameter root is a oneOf/anyOf union with at least one non-object branch.
+// xAI rejects such schemas with invalid_client_tool_schema, so the tool is
+// stripped before egress instead of forwarding a request the upstream refuses.
+// Legal object schemas, object-only unions, and tools without a union root are
+// left untouched.
+func grokResponsesToolSchemaRejectedByUpstream(raw json.RawMessage) bool {
+	params := gjson.GetBytes(raw, "parameters")
+	if !params.Exists() || !params.IsObject() {
+		return false
+	}
+	var schema map[string]json.RawMessage
+	if json.Unmarshal(json.RawMessage(params.Raw), &schema) != nil {
+		return false
+	}
+	_, hasOneOf := schema["oneOf"]
+	_, hasAnyOf := schema["anyOf"]
+	if !hasOneOf && !hasAnyOf {
+		return false
+	}
+	// openAIResponsesSchemaHasObjectOnlyUnion returns true only when a union
+	// exists AND every branch is object-only. A union with any non-object
+	// branch returns false, which is exactly the schema xAI rejects.
+	return !openAIResponsesSchemaHasObjectOnlyUnion(schema, 0)
 }
 
 func deleteGrokOrphanToolControls(body []byte) ([]byte, error) {

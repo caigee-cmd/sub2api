@@ -596,3 +596,117 @@ func requireGrokProtocolFrame(t *testing.T, frames []grokProtocolSSEFrame, event
 	t.Fatalf("missing SSE frame event=%q %s=%q", eventType, path, value)
 	return grokProtocolSSEFrame{}
 }
+
+func TestSanitizeGrokResponsesTools_StripsNonObjectUnionSchema(t *testing.T) {
+	t.Parallel()
+
+	body := []byte(`{
+		"model": "grok-4.5",
+		"tools": [
+			{"type": "function", "name": "mcp__codex_app__automation_update", "description": "Update an automation.", "parameters": {"oneOf": [{"type": "object", "properties": {"id": {"type": "string"}}}, {"type": "string"}]}},
+			{"type": "function", "name": "keep", "description": "A valid tool.", "parameters": {"type": "object", "properties": {"q": {"type": "string"}}}},
+			{"type": "web_search", "name": "web_search"}
+		],
+		"tool_choice": {"type": "function", "name": "mcp__codex_app__automation_update"}
+	}`)
+
+	sanitized, err := sanitizeGrokResponsesTools(body)
+
+	require.NoError(t, err)
+	require.True(t, json.Valid(sanitized))
+	// 坏 union schema 工具被剥离。
+	require.False(t, gjson.GetBytes(sanitized, `tools.#(name=="mcp__codex_app__automation_update")`).Exists())
+	// 合法 function 工具保留。
+	require.Equal(t, "keep", gjson.GetBytes(sanitized, `tools.#(name=="keep").name`).String())
+	require.Equal(t, "object", gjson.GetBytes(sanitized, `tools.#(name=="keep").parameters.type`).String())
+	// 非 function 工具保留。
+	require.Equal(t, "web_search", gjson.GetBytes(sanitized, `tools.#(type=="web_search").type`).String())
+	// 指向已剥离工具的 tool_choice 被清理。
+	require.False(t, gjson.GetBytes(sanitized, "tool_choice").Exists())
+}
+
+func TestSanitizeGrokResponsesTools_UnionSchemaBoundaries(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name    string
+		tool    string
+		kept    bool
+	}{
+		{name: "object-only union kept", tool: `{"type":"function","name":"a","parameters":{"oneOf":[{"type":"object"}]}}`, kept: true},
+		{name: "nested object-only union kept", tool: `{"type":"function","name":"a","parameters":{"anyOf":[{"type":"object","properties":{"p":{"anyOf":[{"type":"object"},{"type":"object"}]}}}]}}`, kept: true},
+		{name: "legal object kept", tool: `{"type":"function","name":"a","parameters":{"type":"object","properties":{}}}`, kept: true},
+		{name: "no parameters kept", tool: `{"type":"function","name":"a"}`, kept: true},
+		{name: "null parameters kept", tool: `{"type":"function","name":"a","parameters":null}`, kept: true},
+		{name: "mixed union stripped", tool: `{"type":"function","name":"a","parameters":{"oneOf":[{"type":"object"},{"type":"string"}]}}`, kept: false},
+		{name: "unproven branch stripped", tool: `{"type":"function","name":"a","parameters":{"oneOf":[{"properties":{}}]}}`, kept: false},
+		{name: "empty union stripped", tool: `{"type":"function","name":"a","parameters":{"anyOf":[]}}`, kept: false},
+		{name: "array branch stripped", tool: `{"type":"function","name":"a","parameters":{"oneOf":[{"type":"object"},{"type":"array"}]}}`, kept: false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			body := []byte(`{"tools":[` + tt.tool + `]}`)
+			sanitized, err := sanitizeGrokResponsesTools(body)
+			require.NoError(t, err)
+			require.True(t, json.Valid(sanitized))
+			if tt.kept {
+				require.Equal(t, "a", gjson.GetBytes(sanitized, "tools.0.name").String())
+			} else {
+				// 唯一工具被剥离后，tools 字段整体删除。
+				require.False(t, gjson.GetBytes(sanitized, "tools").Exists())
+			}
+		})
+	}
+}
+
+func TestGrokResponsesToolSchemaRejectedByUpstream(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		raw  string
+		want bool
+	}{
+		{name: "mixed oneOf rejected", raw: `{"type":"function","name":"x","parameters":{"oneOf":[{"type":"object"},{"type":"string"}]}}`, want: true},
+		{name: "mixed anyOf rejected", raw: `{"type":"function","name":"x","parameters":{"anyOf":[{"type":"object"},{"type":"number"}]}}`, want: true},
+		{name: "object-only accepted", raw: `{"type":"function","name":"x","parameters":{"oneOf":[{"type":"object"}]}}`, want: false},
+		{name: "plain object accepted", raw: `{"type":"function","name":"x","parameters":{"type":"object","properties":{}}}`, want: false},
+		{name: "no parameters accepted", raw: `{"type":"function","name":"x"}`, want: false},
+		{name: "null parameters accepted", raw: `{"type":"function","name":"x","parameters":null}`, want: false},
+		{name: "non-function ignored", raw: `{"type":"web_search"}`, want: false},
+		{name: "invalid json ignored", raw: `{"type":"function","parameters":{"oneOf":[`, want: false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			require.Equal(t, tt.want, grokResponsesToolSchemaRejectedByUpstream(json.RawMessage(tt.raw)))
+		})
+	}
+}
+
+func TestSanitizeGrokResponsesTools_StripToolCleansChoiceAndKeepsSiblings(t *testing.T) {
+	t.Parallel()
+
+	body := []byte(`{
+		"model": "grok-4.5",
+		"tools": [
+			{"type": "function", "name": "bad", "parameters": {"oneOf": [{"type": "object"}, {"type": "string"}]}},
+			{"type": "function", "name": "good", "parameters": {"type": "object", "properties": {}}}
+		],
+		"tool_choice": {"type": "function", "name": "bad"},
+		"parallel_tool_calls": true
+	}`)
+
+	sanitized, err := sanitizeGrokResponsesTools(body)
+
+	require.NoError(t, err)
+	require.True(t, json.Valid(sanitized))
+	// 坏工具被剥离，好工具保留。
+	require.Equal(t, 1, int(gjson.GetBytes(sanitized, "tools.#").Int()))
+	require.Equal(t, "good", gjson.GetBytes(sanitized, "tools.0.name").String())
+	// tool_choice 指向被剥离工具，被清理。
+	require.False(t, gjson.GetBytes(sanitized, "tool_choice").Exists())
+	// parallel_tool_calls 不属于孤儿控制字段，保持不变。
+	require.Equal(t, true, gjson.GetBytes(sanitized, "parallel_tool_calls").Bool())
+}
