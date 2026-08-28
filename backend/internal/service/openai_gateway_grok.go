@@ -1059,6 +1059,8 @@ var grokResponsesSupportedToolTypes = map[string]struct{}{
 	"x_search":           {},
 }
 
+const grokSafeFunctionParameters = `{"type":"object","properties":{},"additionalProperties":true}`
+
 func sanitizeGrokResponsesTools(body []byte) ([]byte, error) {
 	tools := gjson.GetBytes(body, "tools")
 	if !tools.Exists() {
@@ -1084,10 +1086,6 @@ func sanitizeGrokResponsesTools(body []byte) ([]byte, error) {
 			continue
 		}
 		raw := json.RawMessage(tool.Raw)
-		if toolType == "function" && grokResponsesToolSchemaRejectedByUpstream(raw) {
-			toolsChanged = true
-			continue
-		}
 		if toolType == "function" && (!tool.Get("parameters").Exists() || tool.Get("parameters").Type == gjson.Null) {
 			var payload map[string]any
 			if err := decodeOpenAIJSONUseNumber(raw, &payload); err != nil {
@@ -1099,6 +1097,19 @@ func sanitizeGrokResponsesTools(body []byte) ([]byte, error) {
 				return nil, err
 			}
 			raw = encoded
+			toolsChanged = true
+		} else if toolType == "function" && grokFunctionParametersHaveInvalidUnionRoot(tool.Get("parameters")) {
+			var err error
+			raw, err = sjson.SetRawBytes(raw, "parameters", []byte(grokSafeFunctionParameters))
+			if err != nil {
+				return nil, err
+			}
+			if strict := tool.Get("strict"); strict.Exists() && strict.Bool() {
+				raw, err = sjson.SetBytes(raw, "strict", false)
+				if err != nil {
+					return nil, err
+				}
+			}
 			toolsChanged = true
 		}
 		filteredTools = append(filteredTools, raw)
@@ -1150,6 +1161,28 @@ func sanitizeGrokResponsesTools(body []byte) ([]byte, error) {
 	return body, nil
 }
 
+func grokFunctionParametersHaveInvalidUnionRoot(parameters gjson.Result) bool {
+	if !parameters.Exists() || !parameters.IsObject() {
+		return false
+	}
+	for _, keyword := range []string{"anyOf", "oneOf"} {
+		branches := parameters.Get(keyword)
+		if !branches.IsArray() {
+			continue
+		}
+		values := branches.Array()
+		if len(values) == 0 {
+			continue
+		}
+		for _, branch := range values {
+			if !strings.EqualFold(strings.TrimSpace(branch.Get("type").String()), "object") {
+				return true
+			}
+		}
+	}
+	return false
+}
+
 func grokRawToolsContainType(tools []json.RawMessage, want string) bool {
 	for _, tool := range tools {
 		if strings.TrimSpace(gjson.GetBytes(tool, "type").String()) == want {
@@ -1157,32 +1190,6 @@ func grokRawToolsContainType(tools []json.RawMessage, want string) bool {
 		}
 	}
 	return false
-}
-
-// grokResponsesToolSchemaRejectedByUpstream reports whether a function tool's
-// parameter root is a oneOf/anyOf union with at least one non-object branch.
-// xAI rejects such schemas with invalid_client_tool_schema, so the tool is
-// stripped before egress instead of forwarding a request the upstream refuses.
-// Legal object schemas, object-only unions, and tools without a union root are
-// left untouched.
-func grokResponsesToolSchemaRejectedByUpstream(raw json.RawMessage) bool {
-	params := gjson.GetBytes(raw, "parameters")
-	if !params.Exists() || !params.IsObject() {
-		return false
-	}
-	var schema map[string]json.RawMessage
-	if json.Unmarshal(json.RawMessage(params.Raw), &schema) != nil {
-		return false
-	}
-	_, hasOneOf := schema["oneOf"]
-	_, hasAnyOf := schema["anyOf"]
-	if !hasOneOf && !hasAnyOf {
-		return false
-	}
-	// openAIResponsesSchemaHasObjectOnlyUnion returns true only when a union
-	// exists AND every branch is object-only. A union with any non-object
-	// branch returns false, which is exactly the schema xAI rejects.
-	return !openAIResponsesSchemaHasObjectOnlyUnion(schema, 0)
 }
 
 func deleteGrokOrphanToolControls(body []byte) ([]byte, error) {

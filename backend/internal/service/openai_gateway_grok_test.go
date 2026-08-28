@@ -395,24 +395,27 @@ func TestSanitizeGrokResponsesToolsRemovesDeferredFlagsWithToolSearch(t *testing
 	require.True(t, gjson.GetBytes(patched, `tools.#(name=="apply_patch")`).Exists())
 }
 
-	func TestSanitizeGrokResponsesToolsSimplifiesInvalidRootUnion(t *testing.T) {
-		body := []byte(`{"tools":[
+func TestSanitizeGrokResponsesToolsSimplifiesInvalidRootUnion(t *testing.T) {
+	body := []byte(`{"tools":[
 			{"type":"function","name":"mcp__codex_app__automation_update","strict":true,"parameters":{"oneOf":[{"type":"object","properties":{"id":{"type":"string"}}},{"type":"null"}]}},
 			{"type":"function","name":"object_only","strict":true,"parameters":{"type":"object","anyOf":[{"type":"object","properties":{"a":{"type":"string"}}},{"type":"object","properties":{"b":{"type":"integer"}}}]}}
 		]}`)
 
-		patched, err := sanitizeGrokResponsesTools(body)
-		require.NoError(t, err)
-		require.True(t, json.Valid(patched))
+	patched, err := sanitizeGrokResponsesTools(body)
+	require.NoError(t, err)
+	require.True(t, json.Valid(patched))
 
-		// Custom keeps stripping mixed unions instead of rewriting them to a
-		// placeholder object schema; xAI still rejects the original union.
-		require.False(t, gjson.GetBytes(patched, `tools.#(name=="mcp__codex_app__automation_update")`).Exists())
+	mixed := gjson.GetBytes(patched, `tools.#(name=="mcp__codex_app__automation_update")`)
+	require.Equal(t, "object", mixed.Get("parameters.type").String())
+	require.True(t, mixed.Get("parameters.properties").IsObject())
+	require.True(t, mixed.Get("parameters.additionalProperties").Bool())
+	require.False(t, mixed.Get("parameters.oneOf").Exists())
+	require.Equal(t, gjson.False, mixed.Get("strict").Type)
 
-		objectOnly := gjson.GetBytes(patched, `tools.#(name=="object_only")`)
-		require.True(t, objectOnly.Get("parameters.anyOf").Exists())
-		require.Equal(t, gjson.True, objectOnly.Get("strict").Type)
-	}
+	objectOnly := gjson.GetBytes(patched, `tools.#(name=="object_only")`)
+	require.True(t, objectOnly.Get("parameters.anyOf").Exists())
+	require.Equal(t, gjson.True, objectOnly.Get("strict").Type)
+}
 
 func TestPatchGrokResponsesBodySimplifiesTypedInvalidRootUnion(t *testing.T) {
 	body := []byte(`{
@@ -434,16 +437,19 @@ func TestPatchGrokResponsesBodySimplifiesTypedInvalidRootUnion(t *testing.T) {
 		}]
 	}`)
 
-		patched, _, err := patchGrokResponsesBodyWithClientTools(body, "grok-4.6")
-		require.NoError(t, err)
-		require.True(t, json.Valid(patched))
-		require.False(t, gjson.GetBytes(patched, "metadata").Exists())
+	patched, _, err := patchGrokResponsesBodyWithClientTools(body, "grok-4.6")
+	require.NoError(t, err)
+	require.True(t, json.Valid(patched))
+	require.False(t, gjson.GetBytes(patched, "metadata").Exists())
 
-		// Custom strips the flattened mixed-union function instead of rewriting
-		// it into a placeholder object schema.
-		require.False(t, gjson.GetBytes(patched, `tools.#(name=="mcp__codex_app__automation_update")`).Exists())
-		require.False(t, gjson.GetBytes(patched, "tools").Exists())
-	}
+	tool := gjson.GetBytes(patched, `tools.#(name=="mcp__codex_app__automation_update")`)
+	require.Equal(t, "object", tool.Get("parameters.type").String())
+	require.True(t, tool.Get("parameters.properties").IsObject())
+	require.True(t, tool.Get("parameters.additionalProperties").Bool())
+	require.False(t, tool.Get("parameters.oneOf").Exists())
+	require.False(t, tool.Get("parameters.$defs").Exists())
+	require.Equal(t, gjson.False, tool.Get("strict").Type)
+}
 
 func TestSanitizeGrokResponsesToolsKeepsToolChoiceOnlyWithSupportedTools(t *testing.T) {
 	t.Parallel()
