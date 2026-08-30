@@ -2012,7 +2012,7 @@
       </div>
 
       <div
-        v-if="account?.platform === 'openai' && (account?.type === 'oauth' || account?.type === 'setup-token')"
+        v-if="account?.platform === 'openai' && (account?.type === 'oauth' || account?.type === 'setup-token' || account?.type === 'apikey')"
         class="border-t border-gray-200 pt-4 dark:border-dark-600"
       >
         <div class="flex items-center justify-between">
@@ -2062,6 +2062,46 @@
                 codexCLIOnlyAppServerEnabled ? 'translate-x-5' : 'translate-x-0'
               ]"
             />
+          </button>
+        </div>
+        <div v-if="codexCLIOnlyEnabled" class="mt-4 border-l-2 border-gray-200 pl-4 dark:border-dark-600">
+          <label class="input-label mb-1">{{ t('admin.accounts.openai.codexCLIOnlyBlacklist') }}</label>
+          <p class="mb-2 text-xs text-gray-500 dark:text-gray-400">
+            {{ t('admin.accounts.openai.codexCLIOnlyBlacklistDesc') }}
+          </p>
+          <div
+            v-for="(row, i) in codexCLIOnlyBlacklistRows"
+            :key="`codex-acc-bl-${i}`"
+            class="mb-2 flex gap-2"
+          >
+            <input
+              v-model="row.originator"
+              type="text"
+              class="input w-1/4 font-mono text-sm"
+              :placeholder="t('admin.accounts.openai.codexOriginatorPlaceholder')"
+            />
+            <input
+              v-model="row.uaContains"
+              type="text"
+              class="input w-1/3 font-mono text-sm"
+              :placeholder="t('admin.accounts.openai.codexUaContainsPlaceholder')"
+            />
+            <input
+              v-model="row.modelPatterns"
+              type="text"
+              class="input flex-1 font-mono text-sm"
+              :placeholder="t('admin.accounts.openai.codexModelPatternsPlaceholder')"
+            />
+            <button
+              type="button"
+              class="btn btn-secondary btn-sm shrink-0 text-red-600 hover:text-red-700 dark:text-red-400"
+              @click="removeCodexCLIOnlyBlacklistRow(i)"
+            >
+              {{ t('admin.accounts.openai.codexRemoveRow') }}
+            </button>
+          </div>
+          <button type="button" class="btn btn-secondary btn-sm" @click="addCodexCLIOnlyBlacklistRow">
+            {{ t('admin.accounts.openai.codexAddRow') }}
           </button>
         </div>
       </div>
@@ -3229,8 +3269,57 @@ const openAIResponsesMode = ref<OpenAIResponsesMode>('auto')
 const openAIEndpointCapabilities = ref<OpenAIEndpointCapability[]>(['chat_completions', 'embeddings'])
 const openaiOAuthResponsesWebSocketV2Mode = ref<OpenAIWSMode>(OPENAI_WS_MODE_OFF)
 const openaiAPIKeyResponsesWebSocketV2Mode = ref<OpenAIWSMode>(OPENAI_WS_MODE_OFF)
-const codexCLIOnlyEnabled = ref(false)
-const codexCLIOnlyAppServerEnabled = ref(false)
+	const codexCLIOnlyEnabled = ref(false)
+	const codexCLIOnlyAppServerEnabled = ref(false)
+	interface CodexCLIOnlyBlacklistRow {
+	  originator: string
+	  uaContains: string
+	  modelPatterns: string
+	}
+	const codexCLIOnlyBlacklistRows = ref<CodexCLIOnlyBlacklistRow[]>([])
+	function parseCodexCLIOnlyBlacklistRows(raw: unknown): CodexCLIOnlyBlacklistRow[] {
+	  if (!raw) return []
+	  let arr: unknown = raw
+	  if (typeof raw === 'string') {
+	    const trimmed = raw.trim()
+	    if (!trimmed) return []
+	    try {
+	      arr = JSON.parse(trimmed)
+	    } catch {
+	      return []
+	    }
+	  }
+	  if (!Array.isArray(arr)) return []
+	  return arr.map((e: any) => ({
+	    originator: typeof e?.originator === 'string' ? e.originator : '',
+	    uaContains: Array.isArray(e?.ua_contains)
+	      ? e.ua_contains.filter((x: unknown) => typeof x === 'string').join(', ')
+	      : '',
+	    modelPatterns: Array.isArray(e?.model_patterns)
+	      ? e.model_patterns.filter((x: unknown) => typeof x === 'string').join(', ')
+	      : '',
+	  }))
+	}
+	function serializeCodexCLIOnlyBlacklistRows(rows: CodexCLIOnlyBlacklistRow[]): unknown[] {
+	  return rows
+	    .map((r) => {
+	      const entry: Record<string, unknown> = {}
+	      const originator = r.originator.trim()
+	      const uaContains = r.uaContains.split(',').map((s) => s.trim()).filter((s) => s.length > 0)
+	      const modelPatterns = r.modelPatterns.split(',').map((s) => s.trim()).filter((s) => s.length > 0)
+	      if (originator) entry.originator = originator
+	      if (uaContains.length > 0) entry.ua_contains = uaContains
+	      if (modelPatterns.length > 0) entry.model_patterns = modelPatterns
+	      return entry
+	    })
+	    .filter((e) => Object.keys(e).length > 0)
+	}
+	function addCodexCLIOnlyBlacklistRow(): void {
+	  codexCLIOnlyBlacklistRows.value.push({ originator: '', uaContains: '', modelPatterns: '' })
+	}
+	function removeCodexCLIOnlyBlacklistRow(i: number): void {
+	  codexCLIOnlyBlacklistRows.value.splice(i, 1)
+	}
 type CodexFingerprintMode = 'off' | 'device' | 'session' | 'full'
 const codexFingerprintMode = ref<CodexFingerprintMode>('off')
 type CodexImageToolMode = 'inherit' | 'enabled' | 'disabled' | 'block'
@@ -3758,10 +3847,13 @@ const syncFormFromAccount = (newAccount: Account | null) => {
       fallbackEnabledKeys: ['responses_websockets_v2_enabled', 'openai_ws_enabled'],
       defaultMode: OPENAI_WS_MODE_OFF
     })
-    if (newAccount.type === 'oauth' || newAccount.type === 'setup-token') {
+    if (newAccount.type === 'oauth' || newAccount.type === 'setup-token' || newAccount.type === 'apikey') {
       codexCLIOnlyEnabled.value = extra?.codex_cli_only === true
       codexCLIOnlyAppServerEnabled.value =
         extra?.codex_cli_only_allow_app_server === true
+      codexCLIOnlyBlacklistRows.value = parseCodexCLIOnlyBlacklistRows(extra?.codex_cli_only_blacklist)
+    } else {
+      codexCLIOnlyBlacklistRows.value = []
     }
     if (newAccount.type === 'oauth') {
       const fpMode = extra?.codex_fingerprint_mode as string | undefined
@@ -5185,7 +5277,7 @@ const handleSubmit = async () => {
           delete newExtra.codex_image_generation_explicit_tool_policy
       }
 
-      if (props.account.type === 'oauth' || props.account.type === 'setup-token') {
+      if (props.account.type === 'oauth' || props.account.type === 'setup-token' || props.account.type === 'apikey') {
         if (codexCLIOnlyEnabled.value) {
           newExtra.codex_cli_only = true
         } else if (hadCodexCLIOnlyEnabled) {
@@ -5200,6 +5292,12 @@ const handleSubmit = async () => {
           newExtra.codex_cli_only_allow_app_server = true
         } else {
           delete newExtra.codex_cli_only_allow_app_server
+        }
+        const serializedBlacklist = serializeCodexCLIOnlyBlacklistRows(codexCLIOnlyBlacklistRows.value)
+        if (codexCLIOnlyEnabled.value && serializedBlacklist.length > 0) {
+          newExtra.codex_cli_only_blacklist = serializedBlacklist
+        } else {
+          delete newExtra.codex_cli_only_blacklist
         }
       }
 

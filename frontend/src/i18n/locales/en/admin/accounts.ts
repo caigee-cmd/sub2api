@@ -608,7 +608,15 @@ export default {
         planTypeClear: 'Clear (auto-detect)',
         codexCLIOnly: 'Codex official clients only',
         codexCLIOnlyDesc:
-          'Only applies to OpenAI OAuth. When enabled, only Codex official client families are allowed; when disabled, the gateway bypasses this restriction and keeps existing behavior.',
+          'Applies to all OpenAI-platform accounts (including API keys). When enabled, only Codex official client families are allowed, and the global version/fingerprint/blacklist gates also apply; when disabled, the gateway bypasses this restriction and keeps existing behavior.',
+        codexCLIOnlyBlacklist: 'Account-level blacklist',
+        codexCLIOnlyBlacklistDesc:
+          'Effective only when the switch above is on. Deny if any field matches; takes precedence over official-client identity. originator is exact; User-Agent is a contains match; model supports * and ? wildcards. All fields are optional but each entry needs at least one.',
+        codexOriginatorPlaceholder: 'originator (exact, e.g. opencode)',
+        codexUaContainsPlaceholder: 'User-Agent contains markers, comma-separated (e.g. multica-agent-sdk)',
+        codexModelPatternsPlaceholder: 'model patterns, comma-separated, * ? supported (e.g. *gpt*)',
+        codexAddRow: 'Add entry',
+        codexRemoveRow: 'Remove',
         codexCLIOnlyAppServer: 'Allow Codex app-server clients',
         codexCLIOnlyAppServerDesc:
           "Effective only when the switch above is on. When enabled, this account also allows third-party clients that embed the Codex engine over the app-server protocol (e.g. Claude Code's codex plugin); they still pass the global engine-fingerprint gate. OR-combined with the global app-server toggle.",

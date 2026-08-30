@@ -114,26 +114,28 @@ func TestAccount_IsCodexCLIOnlyEnabled(t *testing.T) {
 		require.False(t, account.IsCodexCLIOnlyEnabled())
 	})
 
-	t.Run("非 OAuth 账号始终关闭", func(t *testing.T) {
-		apiKeyAccount := &Account{
-			Platform: PlatformOpenAI,
-			Type:     AccountTypeAPIKey,
-			Extra: map[string]any{
-				"codex_cli_only": true,
-			},
-		}
-		require.False(t, apiKeyAccount.IsCodexCLIOnlyEnabled())
+		t.Run("OpenAI apikey 账号也可开启", func(t *testing.T) {
+			apiKeyAccount := &Account{
+				Platform: PlatformOpenAI,
+				Type:     AccountTypeAPIKey,
+				Extra: map[string]any{
+					"codex_cli_only": true,
+				},
+			}
+			require.True(t, apiKeyAccount.IsCodexCLIOnlyEnabled())
+		})
 
-		otherPlatform := &Account{
-			Platform: PlatformAnthropic,
-			Type:     AccountTypeOAuth,
-			Extra: map[string]any{
-				"codex_cli_only": true,
-			},
-		}
-		require.False(t, otherPlatform.IsCodexCLIOnlyEnabled())
-	})
-}
+		t.Run("非 OpenAI 平台始终关闭", func(t *testing.T) {
+			otherPlatform := &Account{
+				Platform: PlatformAnthropic,
+				Type:     AccountTypeOAuth,
+				Extra: map[string]any{
+					"codex_cli_only": true,
+				},
+			}
+			require.False(t, otherPlatform.IsCodexCLIOnlyEnabled())
+		})
+	}
 
 func TestAccount_IsOpenAIResponsesWebSocketV2Enabled(t *testing.T) {
 	t.Run("OAuth使用OAuth专用开关", func(t *testing.T) {

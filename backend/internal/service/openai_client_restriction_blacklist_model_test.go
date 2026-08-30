@@ -104,3 +104,85 @@ func TestDetect_EmptyBlacklist_Noop(t *testing.T) {
 	r := det.Detect(denyBodyCtx(map[string]string{"User-Agent": "Mozilla/5.0"}, body), apikeyAcc, CodexRestrictionPolicy{}, []byte(body))
 	require.False(t, r.Enabled)
 }
+
+func apiKeyCodexOnlyAccount(extra map[string]any) *Account {
+	if extra == nil {
+		extra = map[string]any{}
+	}
+	extra["codex_cli_only"] = true
+	return &Account{Platform: PlatformOpenAI, Type: AccountTypeAPIKey, Extra: extra}
+}
+
+func TestDetect_APIKeySwitch_OfficialUAPassesWithFingerprint(t *testing.T) {
+	det := NewOpenAICodexClientRestrictionDetector(nil)
+	acc := apiKeyCodexOnlyAccount(nil)
+	body := `{"model":"gpt-5.5","messages":[]}`
+	h := map[string]string{
+		"User-Agent":              "codex_cli_rs/0.141.0 (x)",
+		"x-codex-installation-id": "i1",
+	}
+	r := det.Detect(denyBodyCtx(h, body), acc, CodexRestrictionPolicy{EngineFingerprintSignals: openai.DefaultEngineFingerprintSignals}, []byte(body))
+	require.True(t, r.Enabled)
+	require.True(t, r.Matched)
+	require.Equal(t, CodexClientRestrictionReasonMatchedUA, r.Reason)
+}
+
+func TestDetect_APIKeySwitch_MulticaUARejected(t *testing.T) {
+	det := NewOpenAICodexClientRestrictionDetector(nil)
+	acc := apiKeyCodexOnlyAccount(nil)
+	body := `{"model":"glm-5.2","messages":[]}`
+	r := det.Detect(denyBodyCtx(map[string]string{"User-Agent": "multica-agent-sdk/0.146.0"}, body), acc, CodexRestrictionPolicy{}, []byte(body))
+	require.True(t, r.Enabled)
+	require.False(t, r.Matched)
+	require.Equal(t, CodexClientRestrictionReasonNotMatchedUA, r.Reason)
+}
+
+func TestDetect_APIKeySwitch_AccountBlacklistModelDenied(t *testing.T) {
+	det := NewOpenAICodexClientRestrictionDetector(nil)
+	acc := apiKeyCodexOnlyAccount(nil)
+	pol := CodexRestrictionPolicy{
+		Blacklist:                []openai.DeniedClientEntry{{ModelPatterns: []string{"*gpt*"}}},
+		EngineFingerprintSignals: openai.DefaultEngineFingerprintSignals,
+	}
+	body := `{"model":"gpt-5.5","messages":[]}`
+	h := map[string]string{
+		"User-Agent":              "codex_cli_rs/0.141.0 (x)",
+		"x-codex-installation-id": "i1",
+	}
+	r := det.Detect(denyBodyCtx(h, body), acc, pol, []byte(body))
+	require.True(t, r.Enabled)
+	require.False(t, r.Matched)
+	require.Equal(t, CodexClientRestrictionReasonBlacklistedModel, r.Reason)
+}
+
+func TestDetectCodexClientRestriction_AccountBlacklistMergedWhenSwitchOn(t *testing.T) {
+	s := &OpenAIGatewayService{}
+	acc := apiKeyCodexOnlyAccount(map[string]any{
+		"codex_cli_only_blacklist": []any{
+			map[string]any{"ua_contains": []any{"multica-agent-sdk"}},
+		},
+	})
+	body := `{"model":"glm-5.2","messages":[]}`
+	r := s.detectCodexClientRestriction(denyBodyCtx(map[string]string{"User-Agent": "multica-agent-sdk/0.146.0"}, body), acc, []byte(body))
+	require.True(t, r.Enabled)
+	require.False(t, r.Matched)
+	require.Equal(t, CodexClientRestrictionReasonBlacklisted, r.Reason)
+}
+
+func TestDetectCodexClientRestriction_AccountBlacklistIgnoredWhenSwitchOff(t *testing.T) {
+	s := &OpenAIGatewayService{}
+	acc := &Account{
+		Platform: PlatformOpenAI,
+		Type:     AccountTypeAPIKey,
+		Extra: map[string]any{
+			"codex_cli_only": false,
+			"codex_cli_only_blacklist": []any{
+				map[string]any{"ua_contains": []any{"multica-agent-sdk"}},
+			},
+		},
+	}
+	body := `{"model":"glm-5.2","messages":[]}`
+	r := s.detectCodexClientRestriction(denyBodyCtx(map[string]string{"User-Agent": "multica-agent-sdk/0.146.0"}, body), acc, []byte(body))
+	require.False(t, r.Enabled)
+	require.Equal(t, CodexClientRestrictionReasonDisabled, r.Reason)
+}

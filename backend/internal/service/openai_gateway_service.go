@@ -1059,6 +1059,13 @@ func (s *OpenAIGatewayService) detectCodexClientRestriction(c *gin.Context, acco
 		}
 		policy = s.settingService.GetCodexRestrictionPolicy(ctx)
 	}
+	// 账号级黑名单从属于开关：仅当账号已开 codex_cli_only 时追加到全局 blacklist 后面。
+	// 未开开关的账号即使 extra 里有规则也不生效，避免「没开开关却被账号级规则拦」的意外。
+	if account != nil && account.IsCodexCLIOnlyEnabled() {
+		if extra := account.GetCodexCLIOnlyBlacklist(); len(extra) > 0 {
+			policy.Blacklist = append(append([]openai.DeniedClientEntry(nil), policy.Blacklist...), extra...)
+		}
+	}
 	return s.getCodexClientRestrictionDetector().Detect(c, account, policy, body)
 }
 

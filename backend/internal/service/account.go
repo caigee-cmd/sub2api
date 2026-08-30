@@ -13,11 +13,12 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Wei-Shaw/sub2api/internal/config"
-	"github.com/Wei-Shaw/sub2api/internal/domain"
-	"github.com/Wei-Shaw/sub2api/internal/pkg/geminicli"
-	"github.com/Wei-Shaw/sub2api/internal/pkg/openai_compat"
-	"github.com/Wei-Shaw/sub2api/internal/pkg/xai"
+		"github.com/Wei-Shaw/sub2api/internal/config"
+		"github.com/Wei-Shaw/sub2api/internal/domain"
+		"github.com/Wei-Shaw/sub2api/internal/pkg/geminicli"
+		"github.com/Wei-Shaw/sub2api/internal/pkg/openai"
+		"github.com/Wei-Shaw/sub2api/internal/pkg/openai_compat"
+		"github.com/Wei-Shaw/sub2api/internal/pkg/xai"
 )
 
 type Account struct {
@@ -2290,15 +2291,67 @@ func (a *Account) GetWebSearchEmulationMode() string {
 	}
 }
 
-// IsCodexCLIOnlyEnabled 返回 OpenAI OAuth 账号是否启用"仅允许 Codex 官方客户端"。
+// IsCodexCLIOnlyEnabled 返回 OpenAI 平台账号是否启用"仅允许 Codex 官方客户端"。
+// 覆盖 oauth / setup-token / apikey；非 openai 平台始终关闭。
 // 字段：accounts.extra.codex_cli_only。
 // 字段缺失或类型不正确时，按 false（关闭）处理。
 func (a *Account) IsCodexCLIOnlyEnabled() bool {
-	if a == nil || !a.IsOpenAIOAuth() || a.Extra == nil {
+	if a == nil || !a.IsOpenAI() || a.Extra == nil {
 		return false
 	}
 	enabled, ok := a.Extra["codex_cli_only"].(bool)
 	return ok && enabled
+}
+
+// GetCodexCLIOnlyBlacklist 读取账号级黑名单（accounts.extra.codex_cli_only_blacklist）。
+// 复用全局 DeniedClientEntry 结构（originator / ua_contains / model_patterns，OR 宽 deny）。
+// 仅在 IsCodexCLIOnlyEnabled 为真时由调用方合并进全局 policy；本函数本身不做开关判断。
+// 缺失 / 空 / 非法 JSON → nil（安全忽略）。
+func (a *Account) GetCodexCLIOnlyBlacklist() []openai.DeniedClientEntry {
+	if a == nil || a.Extra == nil {
+		return nil
+	}
+	raw, ok := a.Extra["codex_cli_only_blacklist"]
+	if !ok || raw == nil {
+		return nil
+	}
+	switch v := raw.(type) {
+	case []openai.DeniedClientEntry:
+		if len(v) == 0 {
+			return nil
+		}
+		return v
+	case []any:
+		b, err := json.Marshal(v)
+		if err != nil {
+			return nil
+		}
+		var entries []openai.DeniedClientEntry
+		if json.Unmarshal(b, &entries) != nil || len(entries) == 0 {
+			return nil
+		}
+		return entries
+	case string:
+		trimmed := strings.TrimSpace(v)
+		if trimmed == "" {
+			return nil
+		}
+		var entries []openai.DeniedClientEntry
+		if json.Unmarshal([]byte(trimmed), &entries) != nil || len(entries) == 0 {
+			return nil
+		}
+		return entries
+	default:
+		b, err := json.Marshal(v)
+		if err != nil {
+			return nil
+		}
+		var entries []openai.DeniedClientEntry
+		if json.Unmarshal(b, &entries) != nil || len(entries) == 0 {
+			return nil
+		}
+		return entries
+	}
 }
 
 // IsCodexCLIOnlyAppServerAllowed 返回 codex_cli_only 账号是否额外放行 Codex app-server
