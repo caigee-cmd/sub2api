@@ -14,6 +14,10 @@ import (
 // 未命中官方/黑名单/缺指纹/版本无法识别都沿用这句（避免向伪装客户端泄露门控细节）。
 const CodexOfficialClientsOnlyMessage = "This account only allows Codex official clients"
 
+// CodexModelBlockedMessage 是黑名单模型维度命中时面向客户端的文案：
+// 请求被拒的原因是模型名命中黑名单，与客户端身份无关。
+const CodexModelBlockedMessage = "Request model is not allowed for this gateway"
+
 const (
 	// CodexClientRestrictionReasonDisabled 表示账号未开启 codex_cli_only。
 	CodexClientRestrictionReasonDisabled = "codex_cli_only_disabled"
@@ -27,6 +31,9 @@ const (
 	CodexClientRestrictionReasonForceCodexCLI = "force_codex_cli_enabled"
 	// CodexClientRestrictionReasonBlacklisted 表示请求命中全局黑名单（门内 deny 最先，OR 语义）。
 	CodexClientRestrictionReasonBlacklisted = "blacklist_matched"
+	// CodexClientRestrictionReasonBlacklistedModel 表示请求命中全局黑名单的模型维度（非 UA/originator），
+	// 文案与身份类拒绝区分，避免对模型拦截误报「仅允许官方客户端」。
+	CodexClientRestrictionReasonBlacklistedModel = "blacklist_model_matched"
 	// CodexClientRestrictionReasonMatchedWhitelistClient 表示请求命中全局自由白名单条目（双因子 AND）。
 	CodexClientRestrictionReasonMatchedWhitelistClient = "whitelist_client_matched"
 	// CodexClientRestrictionReasonVersionTooLow 表示 UA 解析出的 Codex 引擎版本低于最低要求。
@@ -45,7 +52,7 @@ const (
 // 账号侧只有 codex_cli_only 开关本身；黑/白名单、最低版本、指纹门均为全局设置。
 type CodexRestrictionPolicy struct {
 	Whitelist                []openai.AllowedClientEntry      // 全局自由白名单（双因子 AND，放行官方集未覆盖的 app-server client）
-	Blacklist                []openai.AllowedClientEntry      // 全局自由黑名单（OR，宽 deny）
+	Blacklist                []openai.DeniedClientEntry       // 全局自由黑名单（OR，宽 deny；支持 model_patterns 维度）
 	MinCodexVersion          string                           // 最低 Codex 引擎版本 semver；""=不校验
 	MaxCodexVersion          string                           // 最高 Codex 引擎版本 semver；""=不校验
 	AllowAppServerClients    bool                             // App Server 开关：对未列名客户端开闸（仍受引擎门约束）
@@ -81,23 +88,18 @@ func NewOpenAICodexClientRestrictionDetector(cfg *config.Config) *OpenAICodexCli
 }
 
 // Detect 门控顺序（每步可短路）：
+//  0. 全局黑名单命中 → 立即拒（与账号开关无关，apikey 账号同样生效；门内 deny 最先，OR 语义）。
 //  1. 账号未开 codex_cli_only → 不限制（Disabled）。
 //  2. gateway.force_codex_cli → 全局旁路放行（ForceCodexCLI）。
-//  3. 黑名单命中 → 立即拒（门内 deny 最先，OR 语义）。
-//  4. 身份候选：官方 UA / 官方 originator / 全局白名单 / App Server 开闸（全局开关 OR 账号开关）；都不命中 → 拒（NotMatchedUA）。
-//  5. Codex 版本（仅官方候选）：版本必须可解析（否则 VersionUndetectable）；< Min → 拒（TooLow）；> Max → 拒（TooHigh）。
-//  6. 引擎指纹 AND 硬门：按 EngineFingerprintSignals 列表勾选 AND 判定（无任何 Required 信号→放行，即「关闭指纹门」=取消所有勾选）；白名单条目可显式 skip。
+//  3. 身份候选：官方 UA / 官方 originator / 全局白名单 / App Server 开闸（全局开关 OR 账号开关）；都不命中 → 拒（NotMatchedUA）。
+//  4. Codex 版本（仅官方候选）：版本必须可解析（否则 VersionUndetectable）；< Min → 拒（TooLow）；> Max → 拒（TooHigh）。
+//  5. 引擎指纹 AND 硬门：按 EngineFingerprintSignals 列表勾选 AND 判定（无任何 Required 信号→放行，即「关闭指纹门」=取消所有勾选）；白名单条目可显式 skip。
 func (d *OpenAICodexClientRestrictionDetector) Detect(c *gin.Context, account *Account, policy CodexRestrictionPolicy, body []byte) CodexClientRestrictionDetectionResult {
-	if account == nil || !account.IsCodexCLIOnlyEnabled() {
-		return CodexClientRestrictionDetectionResult{Enabled: false, Matched: false, Reason: CodexClientRestrictionReasonDisabled}
-	}
-
-	if d != nil && d.cfg != nil && d.cfg.Gateway.ForceCodexCLI {
-		return CodexClientRestrictionDetectionResult{Enabled: true, Matched: true, Reason: CodexClientRestrictionReasonForceCodexCLI}
-	}
-
+	// 0. 全局黑名单先行（与账号类型/开关无关）：UA / originator / 请求模型名任一维度命中即拒。
+	//    模型维度命中时记录 BlacklistedModel，供文案区分（避免对模型拦截误报「仅允许官方客户端」）。
 	userAgent := ""
 	originator := ""
+	requestModel := ""
 	var header http.Header
 	if c != nil {
 		userAgent = c.GetHeader("User-Agent")
@@ -106,10 +108,25 @@ func (d *OpenAICodexClientRestrictionDetector) Detect(c *gin.Context, account *A
 			header = c.Request.Header
 		}
 	}
+	if len(body) > 0 {
+		requestModel = extractRequestModelForRestriction(body)
+	}
+	if openai.MatchDenyEntriesWithModel(userAgent, originator, requestModel, policy.Blacklist) {
+		reason := CodexClientRestrictionReasonBlacklisted
+		if !openai.MatchDenyEntries(userAgent, originator, denyEntriesToAllowedClients(policy.Blacklist)) &&
+			openai.HasDenyModelPatterns(policy.Blacklist) &&
+			openai.IsDeniedModelMatch(requestModel, collectDenyModelPatterns(policy.Blacklist)) {
+			reason = CodexClientRestrictionReasonBlacklistedModel
+		}
+		return CodexClientRestrictionDetectionResult{Enabled: true, Matched: false, Reason: reason}
+	}
 
-	// 3. 黑名单优先（门内 deny 最先，OR：任一已声明字段命中即拒）。
-	if openai.MatchDenyEntries(userAgent, originator, policy.Blacklist) {
-		return CodexClientRestrictionDetectionResult{Enabled: true, Matched: false, Reason: CodexClientRestrictionReasonBlacklisted}
+	if account == nil || !account.IsCodexCLIOnlyEnabled() {
+		return CodexClientRestrictionDetectionResult{Enabled: false, Matched: false, Reason: CodexClientRestrictionReasonDisabled}
+	}
+
+	if d != nil && d.cfg != nil && d.cfg.Gateway.ForceCodexCLI {
+		return CodexClientRestrictionDetectionResult{Enabled: true, Matched: true, Reason: CodexClientRestrictionReasonForceCodexCLI}
 	}
 
 	// 4. 身份候选（优先级：官方 > 全局白名单 > App Server 开闸：全局开关 OR 账号开关）。
@@ -174,7 +191,7 @@ func (d *OpenAICodexClientRestrictionDetector) Detect(c *gin.Context, account *A
 // CodexClientRestrictionMessage 把检测结果映射为面向客户端的 403 文案。
 // 仅版本越界（VersionTooLow/VersionTooHigh）给出带实际版本号与边界的差异化提示——
 // 这类请求其实已被识别为官方 Codex（命中官方 UA/originator），再回「只允许官方客户端」会误导；
-// 其余拒绝原因统一沿用通用兜底句，不暴露门控细节。
+// 模型维度黑名单命中（BlacklistedModel）回模型专属文案；其余拒绝原因统一沿用通用兜底句，不暴露门控细节。
 func CodexClientRestrictionMessage(r CodexClientRestrictionDetectionResult) string {
 	switch r.Reason {
 	case CodexClientRestrictionReasonVersionTooLow:
@@ -185,7 +202,35 @@ func CodexClientRestrictionMessage(r CodexClientRestrictionDetectionResult) stri
 		return fmt.Sprintf(
 			"Your Codex version (%s) exceeds the maximum allowed version (%s). Please downgrade Codex to %s or lower.",
 			r.DetectedVersion, r.MaxCodexVersion, r.MaxCodexVersion)
+	case CodexClientRestrictionReasonBlacklistedModel:
+		return CodexModelBlockedMessage
 	default:
 		return CodexOfficialClientsOnlyMessage
 	}
+}
+
+// extractRequestModelForRestriction 从请求 body 提取顶层 model 字段（小写归一化交由匹配器处理）。
+// 提取失败（非 JSON / 无 model）返回空串，模型维度自然不命中（安全忽略）。
+func extractRequestModelForRestriction(body []byte) string {
+	view := newOpenAIRequestView(body)
+	return view.Model
+}
+
+// denyEntriesToAllowedClients 把 DeniedClientEntry 列表降维为身份判定视图（originator+ua_contains），
+// 供「命中维度是否为纯模型」的区分判定复用既有 MatchDenyEntries。
+func denyEntriesToAllowedClients(entries []openai.DeniedClientEntry) []openai.AllowedClientEntry {
+	out := make([]openai.AllowedClientEntry, 0, len(entries))
+	for _, e := range entries {
+		out = append(out, openai.AllowedClientEntry{Originator: e.Originator, UAContains: e.UAContains})
+	}
+	return out
+}
+
+// collectDenyModelPatterns 汇总黑名单全部 model_patterns（供纯模型命中判定）。
+func collectDenyModelPatterns(entries []openai.DeniedClientEntry) []string {
+	var out []string
+	for _, e := range entries {
+		out = append(out, e.ModelPatterns...)
+	}
+	return out
 }

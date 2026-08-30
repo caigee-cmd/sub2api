@@ -535,9 +535,9 @@ export default {
         codexAllowAppServer: 'Codex app-server',
         codexAllowAppServerDesc:
           '放行内嵌 Codex 引擎、经 app-server 协议接入的第三方客户端（如 Claude Code 的 codex 插件）。默认关闭；开启后此类客户端通过引擎指纹门（下方信号列表）即放行，关闭则仅放行官方客户端与白名单。',
-        codexBlacklist: 'User-Agent/Originator 黑名单',
+        codexBlacklist: 'User-Agent/Originator/模型 黑名单',
         codexBlacklistDesc:
-          '命中任一字段即拒，优先于一切放行。originator 精确匹配，User-Agent 为包含匹配（多个用逗号分隔）。',
+          '命中任一字段即拒，优先于一切放行，且对所有 OpenAI 平台账号生效（无需账号开启 codex_cli_only 开关）。originator 精确匹配，User-Agent 为包含匹配，模型名支持 * / ? 通配（对请求 model 匹配）。字段均可留空，但每条至少填一项。',
         codexWhitelist: 'User-Agent/Originator 白名单',
         codexWhitelistDesc:
           '放行官方集之外的客户端：需 originator 精确，且每个 User-Agent 标记都命中。默认仍需过引擎指纹门，勾「跳过引擎指纹」可免。',
@@ -546,6 +546,7 @@ export default {
           '风险：勾选后该条仅凭 originator + User-Agent（均可伪造）放行，不再要求引擎指纹兜底。仅用于确属可信、但本身不发 codex 引擎指纹的第三方客户端。',
         codexOriginatorPlaceholder: 'originator（精确，如 opencode）',
         codexUaContainsPlaceholder: 'User-Agent 包含标记，逗号分隔（如 opencode/）',
+        codexModelPatternsPlaceholder: '模型名模式，逗号分隔，支持 * ?（如 *gpt*）',
         codexAddRow: '添加一条',
         codexRemoveRow: '删除',
       },

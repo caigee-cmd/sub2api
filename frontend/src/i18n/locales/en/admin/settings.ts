@@ -542,9 +542,9 @@ export default {
         codexAllowAppServer: "Codex app-server",
         codexAllowAppServerDesc:
           "Allow third-party clients that embed the Codex engine and connect over the app-server protocol (e.g. Claude Code's codex plugin). Off by default; when on, such clients are allowed once they pass the engine-fingerprint gate (the signal list below); off = only official clients and the whitelist are allowed.",
-        codexBlacklist: "User-Agent/Originator Blacklist",
+        codexBlacklist: "User-Agent/Originator/Model Blacklist",
         codexBlacklistDesc:
-          "Deny if any field matches; takes precedence over any allow. originator is exact; User-Agent is a 'contains' match (comma-separated).",
+          "Deny if any field matches; takes precedence over any allow. originator is exact; User-Agent is a 'contains' match; model supports * and ? wildcards (matched against the request model). All fields are optional but each entry needs at least one. Applies to all OpenAI-platform accounts regardless of the per-account codex_cli_only switch.",
         codexWhitelist: "User-Agent/Originator Whitelist",
         codexWhitelistDesc:
           "Allow clients outside the official set: requires exact originator and every User-Agent marker present. Still subject to the fingerprint gate unless 'Skip engine fingerprint' is checked.",
@@ -553,6 +553,7 @@ export default {
           "Risk: when checked this entry is allowed on originator + User-Agent alone (both forgeable), with no engine-fingerprint backstop. Use only for trusted third-party clients that genuinely do not send a codex engine fingerprint.",
         codexOriginatorPlaceholder: "originator (exact, e.g. opencode)",
         codexUaContainsPlaceholder: "User-Agent contains markers, comma-separated (e.g. opencode/)",
+        codexModelPatternsPlaceholder: "model patterns, comma-separated, * ? supported (e.g. *gpt*)",
         codexAddRow: "Add entry",
         codexRemoveRow: "Remove",
       },

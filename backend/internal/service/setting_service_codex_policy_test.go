@@ -29,6 +29,40 @@ func TestGetCodexRestrictionPolicy(t *testing.T) {
 	require.Equal(t, "evil", pol.Blacklist[0].Originator)
 }
 
+func TestGetCodexRestrictionPolicy_BlacklistModelPatterns(t *testing.T) {
+	t.Run("model_patterns 条目正常解析", func(t *testing.T) {
+		svc := NewSettingService(&codexPolicyMigrationRepoStub{values: map[string]string{
+			SettingKeyCodexCLIOnlyBlacklist: `[{"ua_contains":["multica-agent-sdk"]},{"model_patterns":["*gpt*","*o3*"]}]`,
+		}}, &config.Config{})
+
+		pol := svc.GetCodexRestrictionPolicy(context.Background())
+		require.Len(t, pol.Blacklist, 2)
+		require.Equal(t, []string{"multica-agent-sdk"}, pol.Blacklist[0].UAContains)
+		require.Equal(t, []string{"*gpt*", "*o3*"}, pol.Blacklist[1].ModelPatterns)
+		require.True(t, openai.HasDenyModelPatterns(pol.Blacklist))
+	})
+
+	t.Run("旧格式条目无 model_patterns → 零值", func(t *testing.T) {
+		svc := NewSettingService(&codexPolicyMigrationRepoStub{values: map[string]string{
+			SettingKeyCodexCLIOnlyBlacklist: `[{"originator":"evil"},{"ua_contains":["badbot/"]}]`,
+		}}, &config.Config{})
+
+		pol := svc.GetCodexRestrictionPolicy(context.Background())
+		require.Len(t, pol.Blacklist, 2)
+		require.Empty(t, pol.Blacklist[0].ModelPatterns)
+		require.False(t, openai.HasDenyModelPatterns(pol.Blacklist))
+	})
+
+	t.Run("model_patterns 非法 JSON → 安全空名单", func(t *testing.T) {
+		svc := NewSettingService(&codexPolicyMigrationRepoStub{values: map[string]string{
+			SettingKeyCodexCLIOnlyBlacklist: `[{"model_patterns":"not-array"}]`,
+		}}, &config.Config{})
+
+		pol := svc.GetCodexRestrictionPolicy(context.Background())
+		require.Empty(t, pol.Blacklist)
+	})
+}
+
 func TestGetCodexRestrictionPolicy_DefaultsSafe(t *testing.T) {
 	svc := NewSettingService(&codexPolicyMigrationRepoStub{values: map[string]string{}}, &config.Config{})
 

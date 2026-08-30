@@ -1047,8 +1047,12 @@ func SnapshotOpenAICompatibilityFallbackMetrics() OpenAICompatibilityFallbackMet
 func (s *OpenAIGatewayService) detectCodexClientRestriction(c *gin.Context, account *Account, body []byte) CodexClientRestrictionDetectionResult {
 	// 安全默认：即便缺 settingService（仅测试/误配可达）也保持指纹门为默认种子，
 	// 避免零值 policy（nil 信号）让指纹门失败开放。有 settingService 时整体覆盖为全局策略。
+	//
+	// 全局黑名单（含 model_patterns 维度）必须对所有 OpenAI 平台账号生效（与账号开关无关，
+	// apikey 账号同样要拦），因此 OpenAI 平台账号一律读取全局 policy（60s atomic.Value 缓存，
+	// 热路径无 DB 开销）。非 OpenAI 平台或无 settingService 时保持安全默认。
 	policy := CodexRestrictionPolicy{EngineFingerprintSignals: openai.DefaultEngineFingerprintSignals}
-	if account != nil && account.IsCodexCLIOnlyEnabled() && s != nil && s.settingService != nil {
+	if s != nil && s.settingService != nil && account != nil && account.IsOpenAI() {
 		ctx := context.Background()
 		if c != nil && c.Request != nil {
 			ctx = c.Request.Context()

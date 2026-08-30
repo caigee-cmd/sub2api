@@ -4634,7 +4634,7 @@
                     <input
                       v-model="row.originator"
                       type="text"
-                      class="input w-1/3 font-mono text-sm"
+                      class="input w-1/4 font-mono text-sm"
                       :placeholder="
                         t(
                           'admin.settings.gatewayForwarding.codexOriginatorPlaceholder',
@@ -4644,10 +4644,20 @@
                     <input
                       v-model="row.uaContains"
                       type="text"
-                      class="input flex-1 font-mono text-sm"
+                      class="input w-1/3 font-mono text-sm"
                       :placeholder="
                         t(
                           'admin.settings.gatewayForwarding.codexUaContainsPlaceholder',
+                        )
+                      "
+                    />
+                    <input
+                      v-model="row.modelPatterns"
+                      type="text"
+                      class="input flex-1 font-mono text-sm"
+                      :placeholder="
+                        t(
+                          'admin.settings.gatewayForwarding.codexModelPatternsPlaceholder',
                         )
                       "
                     />
@@ -10654,6 +10664,7 @@ function parseTablePageSizeOptionsInput(raw: string): number[] | null {
 interface CodexClientRow {
   originator: string;
   uaContains: string; // 逗号分隔，序列化时拆成 ua_contains 数组
+  modelPatterns?: string; // 仅黑名单：逗号分隔，序列化时拆成 model_patterns 数组（支持 * / ? 通配）
   skipEngineFingerprint?: boolean; // 仅白名单：命中即跳过引擎指纹门
 }
 const codexBlacklistRows = ref<CodexClientRow[]>([]);
@@ -10681,11 +10692,47 @@ function parseCodexEntriesToRows(raw: string): CodexClientRow[] {
             .filter((x: unknown) => typeof x === "string")
             .join(", ")
         : "",
+      modelPatterns: Array.isArray(e?.model_patterns)
+        ? e.model_patterns
+            .filter((x: unknown) => typeof x === "string")
+            .join(", ")
+        : "",
       skipEngineFingerprint: e?.skip_engine_fingerprint === true,
     }));
   } catch {
     return [];
   }
+}
+
+function serializeCodexBlacklistRowsToJSON(rows: CodexClientRow[]): string {
+  const entries = rows
+    .map((r) => {
+      const entry: {
+        originator?: string;
+        ua_contains?: string[];
+        model_patterns?: string[];
+      } = {};
+      const originator = r.originator.trim();
+      const uaContains = r.uaContains
+        .split(",")
+        .map((s) => s.trim())
+        .filter((s) => s.length > 0);
+      const modelPatterns = (r.modelPatterns || "")
+        .split(",")
+        .map((s) => s.trim())
+        .filter((s) => s.length > 0);
+      if (originator) entry.originator = originator;
+      if (uaContains.length > 0) entry.ua_contains = uaContains;
+      if (modelPatterns.length > 0) entry.model_patterns = modelPatterns;
+      return entry;
+    })
+    .filter(
+      (e) =>
+        (e.originator || "").length > 0 ||
+        (e.ua_contains?.length || 0) > 0 ||
+        (e.model_patterns?.length || 0) > 0,
+    );
+  return entries.length > 0 ? JSON.stringify(entries) : "";
 }
 
 function serializeCodexRowsToJSON(rows: CodexClientRow[]): string {
@@ -10710,7 +10757,7 @@ function serializeCodexRowsToJSON(rows: CodexClientRow[]): string {
 }
 
 function addCodexBlacklistRow(): void {
-  codexBlacklistRows.value.push({ originator: "", uaContains: "" });
+  codexBlacklistRows.value.push({ originator: "", uaContains: "", modelPatterns: "" });
 }
 function removeCodexBlacklistRow(i: number): void {
   codexBlacklistRows.value.splice(i, 1);
@@ -11337,7 +11384,7 @@ async function saveSettings() {
       codex_cli_only_engine_fingerprint_signals: serializeFingerprintRowsToJSON(
         codexFingerprintRows.value,
       ),
-      codex_cli_only_blacklist: serializeCodexRowsToJSON(
+      codex_cli_only_blacklist: serializeCodexBlacklistRowsToJSON(
         codexBlacklistRows.value,
       ),
       codex_cli_only_whitelist: serializeCodexRowsToJSON(

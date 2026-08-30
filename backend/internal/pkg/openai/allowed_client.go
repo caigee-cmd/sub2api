@@ -15,6 +15,15 @@ type AllowedClientEntry struct {
 	SkipEngineFingerprint bool     `json:"skip_engine_fingerprint"`
 }
 
+// DeniedClientEntry 描述一条黑名单 deny 规则（OR 宽 deny）。
+// 与白名单条目不同：三个维度（originator / ua_contains / model_patterns）均为可选，
+// 任一非空维度命中即拒；全空条目安全忽略。允许 originator-only、ua-only、model-only 条目。
+type DeniedClientEntry struct {
+	Originator    string   `json:"originator,omitempty"`
+	UAContains    []string `json:"ua_contains,omitempty"`
+	ModelPatterns []string `json:"model_patterns,omitempty"`
+}
+
 // IsWhitelistable 报告该条目作为白名单条目是否「有可能命中」——镜像 IsAllowedClientMatch 的结构性
 // 前置：originator 非空、ua_contains 至少一项、且无任何空白 marker（空白 marker 会让整条永不命中）。
 // 仅供管理端写入校验，避免存入静默失效的白名单规则。黑名单（OR 宽 deny，允许 originator-only）不受此约束。
@@ -104,6 +113,96 @@ func IsDeniedClientMatch(userAgent, originator string, entry AllowedClientEntry)
 func MatchDenyEntries(userAgent, originator string, entries []AllowedClientEntry) bool {
 	for _, e := range entries {
 		if IsDeniedClientMatch(userAgent, originator, e) {
+			return true
+		}
+	}
+	return false
+}
+
+// MatchModelPattern 报告请求模型名是否命中单个 glob 模式（大小写不敏感）。
+// 支持 `*`（任意长度，含空）与 `?`（任意单字符）；不含通配符的模式按精确等值处理。
+// 空模式安全忽略（永不命中）。
+func MatchModelPattern(pattern, model string) bool {
+	p := strings.ToLower(strings.TrimSpace(pattern))
+	m := strings.ToLower(strings.TrimSpace(model))
+	if p == "" || m == "" {
+		return false
+	}
+	return matchGlob(p, m)
+}
+
+// matchGlob 实现 `*` / `?` 通配匹配（输入须已归一化为小写、无首尾空白）。
+// 双指针回溯法，O(len(p) * len(m))，避免递归。
+func matchGlob(pattern, s string) bool {
+	pi, si := 0, 0
+	starIdx, starSi := -1, 0
+	for si < len(s) {
+		switch {
+		case pi < len(pattern) && (pattern[pi] == '?' || pattern[pi] == s[si]):
+			pi++
+			si++
+		case pi < len(pattern) && pattern[pi] == '*':
+			starIdx = pi
+			starSi = si
+			pi++
+		case starIdx >= 0:
+			pi = starIdx + 1
+			starSi++
+			si = starSi
+		default:
+			return false
+		}
+	}
+	for pi < len(pattern) && pattern[pi] == '*' {
+		pi++
+	}
+	return pi == len(pattern)
+}
+
+// IsDeniedModelMatch 报告请求模型名是否命中任一 model_patterns 条目（OR）。
+// 模式为空列表 → 不做模型匹配（安全忽略）。
+func IsDeniedModelMatch(model string, patterns []string) bool {
+	for _, p := range patterns {
+		if MatchModelPattern(p, model) {
+			return true
+		}
+	}
+	return false
+}
+
+// IsDeniedEntryMatch 黑名单单条 OR 语义（含模型维度）：originator 精确等值命中，
+// 或任一非空 ua_contains marker 出现在 UA 中，或任一 model_patterns glob 命中请求模型名。
+// 全空条目 → 不 deny（安全忽略）。
+func IsDeniedEntryMatch(userAgent, originator, model string, entry DeniedClientEntry) bool {
+	if want := normalizeCodexClientHeader(entry.Originator); want != "" {
+		if normalizeCodexClientHeader(originator) == want {
+			return true
+		}
+	}
+	ua := normalizeCodexClientHeader(userAgent)
+	for _, marker := range entry.UAContains {
+		if m := normalizeCodexClientHeader(marker); m != "" && strings.Contains(ua, m) {
+			return true
+		}
+	}
+	return IsDeniedModelMatch(model, entry.ModelPatterns)
+}
+
+// MatchDenyEntriesWithModel 判断请求头+模型名是否命中任一黑名单条目（OR，含模型维度）。
+func MatchDenyEntriesWithModel(userAgent, originator, model string, entries []DeniedClientEntry) bool {
+	for _, e := range entries {
+		if IsDeniedEntryMatch(userAgent, originator, model, e) {
+			return true
+		}
+	}
+	return false
+}
+
+// HasDenyModelPatterns 报告黑名单中是否存在任何非空 model_patterns 维度。
+// 供调用方判断是否需要在账号开关关闭时也执行黑名单检查（模型维度与客户端身份无关）。
+func HasDenyModelPatterns(entries []DeniedClientEntry) bool {
+	for _, e := range entries {
+		if len(e.ModelPatterns) > 0 {
 			return true
 		}
 	}

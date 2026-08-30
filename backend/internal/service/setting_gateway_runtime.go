@@ -608,7 +608,7 @@ func (s *SettingService) GetCodexRestrictionPolicy(ctx context.Context) CodexRes
 		}
 		pol.EngineFingerprintSignals = s.loadEngineFingerprintSignals(dbCtx)
 		pol.Whitelist = s.loadCodexClientEntries(dbCtx, SettingKeyCodexCLIOnlyWhitelist)
-		pol.Blacklist = s.loadCodexClientEntries(dbCtx, SettingKeyCodexCLIOnlyBlacklist)
+		pol.Blacklist = s.loadCodexDenyEntries(dbCtx, SettingKeyCodexCLIOnlyBlacklist)
 
 		s.codexRestrictionPolicyCache.Store(&cachedCodexRestrictionPolicy{
 			value:     pol,
@@ -635,6 +635,20 @@ func (s *SettingService) loadCodexClientEntries(ctx context.Context, key string)
 	return entries
 }
 
+// loadCodexDenyEntries 读取并解析 []openai.DeniedClientEntry JSON 设置（黑名单，支持 model_patterns 维度）；
+// 缺失/空/非法 → nil（安全忽略）。兼容旧格式：旧条目仅有 originator/ua_contains 字段，Unmarshal 天然兼容。
+func (s *SettingService) loadCodexDenyEntries(ctx context.Context, key string) []openai.DeniedClientEntry {
+	v, err := s.settingRepo.GetValue(ctx, key)
+	if err != nil || strings.TrimSpace(v) == "" {
+		return nil
+	}
+	var entries []openai.DeniedClientEntry
+	if json.Unmarshal([]byte(v), &entries) != nil {
+		return nil
+	}
+	return entries
+}
+
 // loadEngineFingerprintSignals 读取引擎指纹信号列表;缺失/空/非法 → 默认种子。
 func (s *SettingService) loadEngineFingerprintSignals(ctx context.Context) []openai.EngineFingerprintSignal {
 	v, err := s.settingRepo.GetValue(ctx, SettingKeyCodexCLIOnlyEngineFingerprintSignals)
@@ -649,16 +663,17 @@ func (s *SettingService) loadEngineFingerprintSignals(ctx context.Context) []ope
 }
 
 // ValidateCodexClientEntriesJSON 校验 codex_cli_only 名单 JSON 配置（黑名单语义）：
-// 空=合法（禁用）；非空须为 []AllowedClientEntry 的 JSON 数组。黑名单是 OR 宽 deny，
-// 允许 originator-only 条目，故不校验 ua_contains。白名单请用 ValidateCodexWhitelistEntriesJSON。
+// 空=合法（禁用）；非空须为 []DeniedClientEntry 的 JSON 数组。黑名单是 OR 宽 deny，
+// 允许 originator-only / ua-only / model-only 条目，故不校验维度组合。
+// 白名单请用 ValidateCodexWhitelistEntriesJSON。
 func ValidateCodexClientEntriesJSON(raw string) error {
 	trimmed := strings.TrimSpace(raw)
 	if trimmed == "" {
 		return nil
 	}
-	var entries []openai.AllowedClientEntry
+	var entries []openai.DeniedClientEntry
 	if err := json.Unmarshal([]byte(trimmed), &entries); err != nil {
-		return fmt.Errorf("must be empty or a valid JSON array of {originator, ua_contains}")
+		return fmt.Errorf("must be empty or a valid JSON array of {originator, ua_contains, model_patterns}")
 	}
 	return nil
 }

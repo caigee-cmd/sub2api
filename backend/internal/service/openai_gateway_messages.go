@@ -43,6 +43,16 @@ func (s *OpenAIGatewayService) ForwardAsAnthropic(
 		return nil, err
 	}
 
+	// 全局黑名单门（含 model_patterns 维度）：/v1/messages 与 /v1/responses、/v1/chat/completions
+	// 一致化，防止非官方客户端经 Messages 路径绕过黑名单。
+	restrictionResult := s.detectCodexClientRestriction(c, account, body)
+	logCodexCLIOnlyDetection(ctx, c, account, getAPIKeyIDFromContext(c), restrictionResult, body)
+	if restrictionResult.Enabled && !restrictionResult.Matched {
+		MarkOpsClientBusinessLimited(c, OpsClientBusinessLimitedReasonLocalPolicyDenied)
+		writeAnthropicError(c, http.StatusForbidden, "forbidden_error", CodexClientRestrictionMessage(restrictionResult))
+		return nil, errors.New("codex_cli_only restriction: request denied by global blacklist")
+	}
+
 	// 入口分流（国产供应商 Anthropic 协议）：上游为供应商原生 Anthropic 端点时，
 	// /v1/messages 请求零转换直通（仅模型名映射 + 少量 body 清洗），完整保留
 	// thinking / tool_use / cache 语义，适配 Claude Code 等原生客户端。

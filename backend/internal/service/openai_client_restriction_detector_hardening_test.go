@@ -53,7 +53,7 @@ func TestDetect_Hardening(t *testing.T) {
 	fp := map[string]string{"x-codex-installation-id": "i1"} // 引擎指纹
 
 	t.Run("黑名单优先于官方身份", func(t *testing.T) {
-		pol := CodexRestrictionPolicy{Blacklist: []openai.AllowedClientEntry{{Originator: "codex_cli_rs"}}}
+		pol := CodexRestrictionPolicy{Blacklist: []openai.DeniedClientEntry{{Originator: "codex_cli_rs"}}}
 		h := map[string]string{"User-Agent": "codex_cli_rs/0.141.0 (x)", "originator": "codex_cli_rs", "x-codex-installation-id": "i1"}
 		r := det.Detect(hdrCtx(h), acc, pol, nil)
 		require.False(t, r.Matched)
