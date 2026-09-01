@@ -72,7 +72,7 @@ func (s *PaymentService) CreateOrder(ctx context.Context, req CreateOrderRequest
 			limitAmount = upgradeProration.Payable
 		}
 	} else if req.OrderType == payment.OrderTypeBalance {
-		orderAmount = calculateCreditedBalance(req.Amount, cfg.BalanceRechargeMultiplier)
+		orderAmount = calculateCreditedBalanceWithBonus(req.Amount, cfg.BalanceRechargeMultiplier, cfg.RechargeBonusEnabled, cfg.RechargeBonusPercent)
 	}
 	feeRate := cfg.RechargeFeeRate
 	methodCurrency := payment.DefaultPaymentCurrency

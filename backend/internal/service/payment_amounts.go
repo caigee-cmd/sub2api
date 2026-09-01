@@ -8,6 +8,7 @@ import (
 )
 
 const defaultBalanceRechargeMultiplier = 1.0
+const maxRechargeBonusPercent = 1000.0
 
 func normalizeBalanceRechargeMultiplier(multiplier float64) float64 {
 	if math.IsNaN(multiplier) || math.IsInf(multiplier, 0) || multiplier <= 0 {
@@ -30,6 +31,39 @@ func calculateCreditedBalance(paymentAmount, multiplier float64) float64 {
 		Mul(decimal.NewFromFloat(normalizeBalanceRechargeMultiplier(multiplier))).
 		Round(2).
 		InexactFloat64()
+}
+
+func normalizeRechargeBonusPercent(percent float64) float64 {
+	if math.IsNaN(percent) || math.IsInf(percent, 0) || percent < 0 {
+		return 0
+	}
+	if percent > maxRechargeBonusPercent {
+		return maxRechargeBonusPercent
+	}
+	return percent
+}
+
+func effectiveRechargeBonusPercent(enabled bool, percent float64) float64 {
+	if !enabled {
+		return 0
+	}
+	return normalizeRechargeBonusPercent(percent)
+}
+
+func applyRechargeBonus(baseAmount, percent float64) float64 {
+	pct := normalizeRechargeBonusPercent(percent)
+	if baseAmount <= 0 || pct <= 0 {
+		return decimal.NewFromFloat(baseAmount).Round(2).InexactFloat64()
+	}
+	return decimal.NewFromFloat(baseAmount).
+		Mul(decimal.NewFromFloat(1).Add(decimal.NewFromFloat(pct).Div(decimal.NewFromInt(100)))).
+		Round(2).
+		InexactFloat64()
+}
+
+func calculateCreditedBalanceWithBonus(paymentAmount, multiplier float64, bonusEnabled bool, bonusPercent float64) float64 {
+	base := calculateCreditedBalance(paymentAmount, multiplier)
+	return applyRechargeBonus(base, effectiveRechargeBonusPercent(bonusEnabled, bonusPercent))
 }
 
 func calculateGatewayRefundAmount(orderAmount, payAmount, refundAmount float64, currency string) float64 {

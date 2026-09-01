@@ -75,9 +75,13 @@
                   <span class="font-medium text-gray-700 dark:text-gray-300">{{ t('payment.actualPay') }}</span>
                   <span class="text-lg font-bold text-primary-600 dark:text-primary-400">{{ formatSelectedPaymentAmount(totalAmount) }}</span>
                 </div>
-                <div v-if="balanceRechargeMultiplier !== 1" class="flex justify-between" :class="{ 'border-t border-gray-200 pt-2 dark:border-dark-600': feeRate <= 0 }">
+                <div v-if="showCreditedPreview" class="flex justify-between" :class="{ 'border-t border-gray-200 pt-2 dark:border-dark-600': feeRate <= 0 }">
                   <span class="text-gray-500 dark:text-gray-400">{{ t('payment.creditedBalance') }}</span>
                   <span class="text-gray-900 dark:text-white">${{ creditedAmount.toFixed(2) }}</span>
+                </div>
+                <div v-if="hasRechargeBonus && validAmount > 0" class="flex justify-between text-xs">
+                  <span class="text-gray-500 dark:text-gray-400">{{ t('payment.rechargeBonusLine') }}</span>
+                  <span class="text-gray-900 dark:text-white">+${{ (creditedAmount - validAmount * balanceRechargeMultiplier).toFixed(2) }}</span>
                 </div>
                 <p v-if="balanceRechargeMultiplier !== 1" class="border-t border-gray-200 pt-2 text-xs text-gray-500 dark:border-dark-600 dark:text-gray-400">
                   {{ t('payment.rechargeRatePreview', { usd: balanceRechargeMultiplier.toFixed(2) }) }}
@@ -502,7 +506,7 @@ function onPaymentSettled() {
 // All checkout data from single API call
 const checkout = ref<CheckoutInfoResponse>({
   methods: {}, global_min: 0, global_max: 0,
-  plans: [], balance_disabled: false, balance_recharge_multiplier: 1, subscription_usd_to_cny_rate: 0, recharge_fee_rate: 0, help_text: '', help_image_url: '', stripe_publishable_key: '',
+  plans: [], balance_disabled: false, balance_recharge_multiplier: 1, recharge_bonus_enabled: false, recharge_bonus_percent: 0, subscription_usd_to_cny_rate: 0, recharge_fee_rate: 0, help_text: '', help_image_url: '', stripe_publishable_key: '',
 })
 
 const tabs = computed(() => {
@@ -524,7 +528,17 @@ const subscriptionUsdToCnyRate = computed(() => {
   const rate = checkout.value.subscription_usd_to_cny_rate
   return Number.isFinite(rate) && rate > 0 ? rate : 0
 })
-const creditedAmount = computed(() => Math.round((validAmount.value * balanceRechargeMultiplier.value) * 100) / 100)
+const rechargeBonusPercent = computed(() => {
+  if (!checkout.value.recharge_bonus_enabled) return 0
+  const percent = checkout.value.recharge_bonus_percent
+  return Number.isFinite(percent) && percent > 0 ? percent : 0
+})
+const creditedAmount = computed(() => {
+  const base = validAmount.value * balanceRechargeMultiplier.value
+  return Math.round(base * (1 + rechargeBonusPercent.value / 100) * 100) / 100
+})
+const hasRechargeBonus = computed(() => rechargeBonusPercent.value > 0)
+const showCreditedPreview = computed(() => balanceRechargeMultiplier.value !== 1 || hasRechargeBonus.value)
 
 // Adaptive grid: center single card, 2-col for 2 plans, 3-col for 3+
 const planGridClass = computed(() => {

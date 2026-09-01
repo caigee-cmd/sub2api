@@ -291,6 +291,30 @@ func TestCalculateCreditedBalanceStillUsesRechargeMultiplier(t *testing.T) {
 	}
 }
 
+func TestCalculateCreditedBalanceWithBonus(t *testing.T) {
+	t.Parallel()
+
+	got := calculateCreditedBalanceWithBonus(10, 1, true, 20)
+	if got != 12 {
+		t.Fatalf("credited with 20%% bonus = %v, want 12", got)
+	}
+
+	got = calculateCreditedBalanceWithBonus(10, 0.14, true, 50)
+	if got != 2.1 {
+		t.Fatalf("credited with FX + 50%% bonus = %v, want 2.1", got)
+	}
+
+	got = calculateCreditedBalanceWithBonus(10, 1, false, 20)
+	if got != 10 {
+		t.Fatalf("disabled bonus should not change credit = %v, want 10", got)
+	}
+
+	got = calculateCreditedBalanceWithBonus(10, 1, true, 0)
+	if got != 10 {
+		t.Fatalf("zero percent should not change credit = %v, want 10", got)
+	}
+}
+
 func TestCalculateCreateOrderPayAmountRejectsFractionalZeroDecimal(t *testing.T) {
 	t.Parallel()
 

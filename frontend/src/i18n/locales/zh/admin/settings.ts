@@ -694,6 +694,11 @@ export default {
         balanceRechargeMultiplier: '余额充值倍率',
         balanceRechargeMultiplierHint: '用户每支付 1 CNY 可获得多少 USD 余额',
         balanceRechargePreview: '预览：1 CNY = {usd} USD',
+        rechargeBonusEnabled: '充值赠送',
+        rechargeBonusEnabledHint: '开启后，余额充值支付成功入账时，会在换算后的余额上额外赠送',
+        rechargeBonusPercent: '赠送比例',
+        rechargeBonusPercentHint: '支付成功后额外赠送的百分比。20 表示充 10 到账 12',
+        rechargeBonusPreview: '预览：支付 100，到账 {amount}',
         subscriptionUsdToCnyRate: '订阅 CNY 换算汇率',
         subscriptionUsdToCnyRateHint:
           'CNY 支付通道下，套餐每 1 USD 价格收取多少 CNY（如 7.15）。0 或留空 = 不换算，订阅按 price 数值直接收款。启用后所有套餐 price 必须按 USD 定价',

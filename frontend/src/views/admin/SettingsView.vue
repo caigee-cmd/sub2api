@@ -7879,6 +7879,71 @@
                       }}
                     </p>
                   </div>
+                  <div class="sm:col-span-5">
+                    <div class="flex items-center justify-between">
+                      <div>
+                        <label class="font-medium text-gray-900 dark:text-white">{{
+                          t("admin.settings.payment.rechargeBonusEnabled")
+                        }}</label>
+                        <p class="text-sm text-gray-500 dark:text-gray-400">
+                          {{ t("admin.settings.payment.rechargeBonusEnabledHint") }}
+                        </p>
+                      </div>
+                      <Toggle v-model="form.payment_recharge_bonus_enabled" />
+                    </div>
+                  </div>
+                  <div v-if="form.payment_recharge_bonus_enabled">
+                    <label class="input-label">{{
+                      t("admin.settings.payment.rechargeBonusPercent")
+                    }}</label>
+                    <div class="relative">
+                      <input
+                        :value="form.payment_recharge_bonus_percent ?? ''"
+                        @input="
+                          form.payment_recharge_bonus_percent = Math.min(
+                            1000,
+                            Math.max(
+                              0,
+                              Math.round(
+                                parseFloat(
+                                  ($event.target as HTMLInputElement).value ||
+                                    '0',
+                                ) * 100,
+                              ) / 100,
+                            ),
+                          )
+                        "
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        max="1000"
+                        class="input pr-8"
+                      />
+                      <span
+                        class="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3 text-gray-400"
+                        >%</span
+                      >
+                    </div>
+                    <p class="mt-0.5 text-xs text-gray-400">
+                      {{ t("admin.settings.payment.rechargeBonusPercentHint") }}
+                    </p>
+                    <p
+                      v-if="(Number(form.payment_recharge_bonus_percent) || 0) > 0"
+                      class="mt-1 text-xs font-medium text-primary-600 dark:text-primary-400"
+                    >
+                      {{
+                        t("admin.settings.payment.rechargeBonusPreview", {
+                          amount: (
+                            100 *
+                            (Number(form.payment_balance_recharge_multiplier) || 1) *
+                            (1 +
+                              (Number(form.payment_recharge_bonus_percent) || 0) /
+                                100)
+                          ).toFixed(2),
+                        })
+                      }}
+                    </p>
+                  </div>
                   <div>
                     <label class="input-label">{{
                       t("admin.settings.payment.subscriptionUsdToCnyRate")
@@ -9563,6 +9628,8 @@ const form = reactive<SettingsForm>({
   payment_order_timeout_minutes: 30,
   payment_balance_disabled: false,
   payment_balance_recharge_multiplier: 1,
+  payment_recharge_bonus_enabled: false,
+  payment_recharge_bonus_percent: 0,
   payment_subscription_usd_to_cny_rate: 0,
   payment_recharge_fee_rate: 0,
   payment_enabled_types: [],
@@ -11405,6 +11472,9 @@ async function saveSettings() {
       payment_balance_disabled: form.payment_balance_disabled,
       payment_balance_recharge_multiplier:
         Number(form.payment_balance_recharge_multiplier) || 1,
+      payment_recharge_bonus_enabled: form.payment_recharge_bonus_enabled,
+      payment_recharge_bonus_percent:
+        Number(form.payment_recharge_bonus_percent) || 0,
       payment_subscription_usd_to_cny_rate:
         Number(form.payment_subscription_usd_to_cny_rate) || 0,
       payment_recharge_fee_rate: Number(form.payment_recharge_fee_rate) || 0,

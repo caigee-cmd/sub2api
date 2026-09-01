@@ -699,6 +699,11 @@ export default {
         balanceRechargeMultiplier: 'Balance Recharge Multiplier',
         balanceRechargeMultiplierHint: 'How many USD balance the user receives for each 1 CNY paid',
         balanceRechargePreview: 'Preview: 1 CNY = {usd} USD',
+        rechargeBonusEnabled: 'Recharge Bonus',
+        rechargeBonusEnabledHint: 'When enabled, successful balance top-ups receive extra credit on top of the converted amount',
+        rechargeBonusPercent: 'Bonus Percent',
+        rechargeBonusPercentHint: 'Extra percent credited after payment succeeds. 20 means $10 becomes $12',
+        rechargeBonusPreview: 'Preview: pay 100, credited {amount}',
         subscriptionUsdToCnyRate: 'Subscription USD to CNY Rate',
         subscriptionUsdToCnyRateHint:
           'CNY charged per 1 USD of plan price on CNY channels (e.g. 7.15). 0 or empty = disabled, plan price is charged as-is. When enabled, all plan prices must be set in USD',
