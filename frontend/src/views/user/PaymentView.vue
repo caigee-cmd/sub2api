@@ -531,17 +531,19 @@ const subscriptionUsdToCnyRate = computed(() => {
 const rechargeBonusPercent = computed(() => {
   if (!checkout.value.recharge_bonus_enabled) return 0
   const percent = checkout.value.recharge_bonus_percent
-  return Number.isFinite(percent) && percent > 0 ? percent : 0
+  return Number.isFinite(percent) && percent != null && percent > 0 ? percent : 0
 })
 const rechargeBonusMaxAmount = computed(() => {
   const maxAmount = checkout.value.recharge_bonus_max_amount
-  return Number.isFinite(maxAmount) && maxAmount > 0 ? maxAmount : 0
+  return Number.isFinite(maxAmount) && maxAmount != null && maxAmount > 0 ? maxAmount : 0
 })
 const creditedAmount = computed(() => {
   const base = validAmount.value * balanceRechargeMultiplier.value
-  let bonus = Math.round(base * (rechargeBonusPercent.value / 100) * 100) / 100
-  if (rechargeBonusMaxAmount.value > 0 && bonus > rechargeBonusMaxAmount.value) {
-    bonus = rechargeBonusMaxAmount.value
+  const percent = rechargeBonusPercent.value
+  const cap = rechargeBonusMaxAmount.value
+  let bonus = Math.round(base * (percent / 100) * 100) / 100
+  if (cap > 0 && bonus > cap) {
+    bonus = cap
   }
   return Math.round((base + bonus) * 100) / 100
 })
