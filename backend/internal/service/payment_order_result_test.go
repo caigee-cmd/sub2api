@@ -315,6 +315,23 @@ func TestCalculateCreditedBalanceWithBonus(t *testing.T) {
 	}
 }
 
+func TestRechargeBonusAppliesFirstOnly(t *testing.T) {
+	t.Parallel()
+
+	if !RechargeBonusApplies(true, false, false) {
+		t.Fatal("global bonus should apply to every recharge")
+	}
+	if !RechargeBonusApplies(true, true, true) {
+		t.Fatal("first-only bonus should apply to first recharge")
+	}
+	if RechargeBonusApplies(true, true, false) {
+		t.Fatal("first-only bonus should not apply after first recharge")
+	}
+	if RechargeBonusApplies(false, true, true) {
+		t.Fatal("disabled bonus should never apply")
+	}
+}
+
 func TestCalculateCreateOrderPayAmountRejectsFractionalZeroDecimal(t *testing.T) {
 	t.Parallel()
 

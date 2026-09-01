@@ -274,6 +274,7 @@ type SystemSettings struct {
 	PaymentBalanceRechargeMultiplier float64  `json:"payment_balance_recharge_multiplier"`
 	PaymentRechargeBonusEnabled      bool     `json:"payment_recharge_bonus_enabled"`
 	PaymentRechargeBonusPercent      float64  `json:"payment_recharge_bonus_percent"`
+	PaymentRechargeBonusFirstOnly    bool     `json:"payment_recharge_bonus_first_only"`
 	PaymentSubscriptionUSDToCNYRate  float64  `json:"payment_subscription_usd_to_cny_rate"`
 	PaymentRechargeFeeRate           float64  `json:"payment_recharge_fee_rate"`
 	PaymentLoadBalanceStrat          string   `json:"payment_load_balance_strategy"`

@@ -140,6 +140,18 @@ func (h *PaymentHandler) GetCheckoutInfo(c *gin.Context) {
 		})
 	}
 
+	bonusEnabled := cfg.RechargeBonusEnabled
+	if cfg.RechargeBonusEnabled && cfg.RechargeBonusFirstOnly {
+		if subject, ok := requireAuth(c); ok {
+			isFirst, firstErr := h.paymentService.IsFirstBalanceRecharge(ctx, subject.UserID)
+			if firstErr != nil {
+				response.ErrorFrom(c, firstErr)
+				return
+			}
+			bonusEnabled = service.RechargeBonusApplies(cfg.RechargeBonusEnabled, true, isFirst)
+		}
+	}
+
 	response.Success(c, checkoutInfoResponse{
 		Methods:                       limitsResp.Methods,
 		GlobalMin:                     limitsResp.GlobalMin,
@@ -147,8 +159,9 @@ func (h *PaymentHandler) GetCheckoutInfo(c *gin.Context) {
 		Plans:                         planList,
 		BalanceDisabled:               cfg.BalanceDisabled,
 		BalanceRechargeMultiplier:     cfg.BalanceRechargeMultiplier,
-		RechargeBonusEnabled:          cfg.RechargeBonusEnabled,
+		RechargeBonusEnabled:          bonusEnabled,
 		RechargeBonusPercent:          cfg.RechargeBonusPercent,
+		RechargeBonusFirstOnly:        cfg.RechargeBonusFirstOnly,
 		SubscriptionUSDToCNYRate:      cfg.SubscriptionUSDToCNYRate,
 		RechargeFeeRate:               cfg.RechargeFeeRate,
 		HelpText:                      cfg.HelpText,
@@ -168,6 +181,7 @@ type checkoutInfoResponse struct {
 	BalanceRechargeMultiplier     float64                         `json:"balance_recharge_multiplier"`
 	RechargeBonusEnabled          bool                            `json:"recharge_bonus_enabled"`
 	RechargeBonusPercent          float64                         `json:"recharge_bonus_percent"`
+	RechargeBonusFirstOnly        bool                            `json:"recharge_bonus_first_only"`
 	SubscriptionUSDToCNYRate      float64                         `json:"subscription_usd_to_cny_rate"`
 	RechargeFeeRate               float64                         `json:"recharge_fee_rate"`
 	HelpText                      string                          `json:"help_text"`

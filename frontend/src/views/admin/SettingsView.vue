@@ -7943,6 +7943,17 @@
                         })
                       }}
                     </p>
+                    <div class="mt-3 flex items-center justify-between">
+                      <div>
+                        <label class="font-medium text-gray-900 dark:text-white">{{
+                          t("admin.settings.payment.rechargeBonusFirstOnly")
+                        }}</label>
+                        <p class="text-sm text-gray-500 dark:text-gray-400">
+                          {{ t("admin.settings.payment.rechargeBonusFirstOnlyHint") }}
+                        </p>
+                      </div>
+                      <Toggle v-model="form.payment_recharge_bonus_first_only" />
+                    </div>
                   </div>
                   <div>
                     <label class="input-label">{{
@@ -9630,6 +9641,7 @@ const form = reactive<SettingsForm>({
   payment_balance_recharge_multiplier: 1,
   payment_recharge_bonus_enabled: false,
   payment_recharge_bonus_percent: 0,
+  payment_recharge_bonus_first_only: false,
   payment_subscription_usd_to_cny_rate: 0,
   payment_recharge_fee_rate: 0,
   payment_enabled_types: [],
@@ -11475,6 +11487,7 @@ async function saveSettings() {
       payment_recharge_bonus_enabled: form.payment_recharge_bonus_enabled,
       payment_recharge_bonus_percent:
         Number(form.payment_recharge_bonus_percent) || 0,
+      payment_recharge_bonus_first_only: form.payment_recharge_bonus_first_only,
       payment_subscription_usd_to_cny_rate:
         Number(form.payment_subscription_usd_to_cny_rate) || 0,
       payment_recharge_fee_rate: Number(form.payment_recharge_fee_rate) || 0,

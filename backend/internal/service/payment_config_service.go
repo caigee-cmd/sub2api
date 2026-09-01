@@ -29,6 +29,8 @@ const (
 	// 在换算后余额上额外赠送的比例。关闭时 percent 保留但不生效。
 	SettingRechargeBonusEnabled = "RECHARGE_BONUS_ENABLED"
 	SettingRechargeBonusPercent = "RECHARGE_BONUS_PERCENT"
+	// SettingRechargeBonusFirstOnly 为 true 时，仅用户第一笔有效余额充值享受赠送。
+	SettingRechargeBonusFirstOnly = "RECHARGE_BONUS_FIRST_ONLY"
 	// SettingSubscriptionUSDToCNYRate 是订阅 CNY 换算汇率（1 USD = X CNY）。
 	// 0/未配置 = 关闭换算（订阅按 price 数值直付），显式配置后 CNY 通道订阅按 price × rate 收款。
 	SettingSubscriptionUSDToCNYRate      = "SUBSCRIPTION_USD_TO_CNY_RATE"
@@ -65,6 +67,7 @@ type PaymentConfig struct {
 	BalanceRechargeMultiplier float64  `json:"balance_recharge_multiplier"`
 	RechargeBonusEnabled      bool     `json:"recharge_bonus_enabled"`
 	RechargeBonusPercent      float64  `json:"recharge_bonus_percent"`
+	RechargeBonusFirstOnly    bool     `json:"recharge_bonus_first_only"`
 	// SubscriptionUSDToCNYRate 为 0 时订阅换算关闭（兼容存量行为）。
 	SubscriptionUSDToCNYRate float64 `json:"subscription_usd_to_cny_rate"`
 	RechargeFeeRate          float64 `json:"recharge_fee_rate"`
@@ -101,6 +104,7 @@ type UpdatePaymentConfigRequest struct {
 	BalanceRechargeMultiplier *float64 `json:"balance_recharge_multiplier"`
 	RechargeBonusEnabled      *bool    `json:"recharge_bonus_enabled"`
 	RechargeBonusPercent      *float64 `json:"recharge_bonus_percent"`
+	RechargeBonusFirstOnly    *bool    `json:"recharge_bonus_first_only"`
 	SubscriptionUSDToCNYRate  *float64 `json:"subscription_usd_to_cny_rate"`
 	RechargeFeeRate           *float64 `json:"recharge_fee_rate"`
 	LoadBalanceStrategy       *string  `json:"load_balance_strategy"`
@@ -227,7 +231,7 @@ func (s *PaymentConfigService) GetPaymentConfig(ctx context.Context) (*PaymentCo
 	keys := []string{
 		SettingPaymentEnabled, SettingMinRechargeAmount, SettingMaxRechargeAmount,
 		SettingDailyRechargeLimit, SettingOrderTimeoutMinutes, SettingMaxPendingOrders,
-		SettingEnabledPaymentTypes, SettingBalancePayDisabled, SettingBalanceRechargeMult, SettingRechargeBonusEnabled, SettingRechargeBonusPercent, SettingSubscriptionUSDToCNYRate, SettingRechargeFeeRate, SettingLoadBalanceStrategy,
+		SettingEnabledPaymentTypes, SettingBalancePayDisabled, SettingBalanceRechargeMult, SettingRechargeBonusEnabled, SettingRechargeBonusPercent, SettingRechargeBonusFirstOnly, SettingSubscriptionUSDToCNYRate, SettingRechargeFeeRate, SettingLoadBalanceStrategy,
 		SettingProductNamePrefix, SettingProductNameSuffix,
 		SettingHelpImageURL, SettingHelpText,
 		SettingCancelRateLimitOn, SettingCancelRateLimitMax,
@@ -258,6 +262,7 @@ func (s *PaymentConfigService) parsePaymentConfig(vals map[string]string) *Payme
 		BalanceRechargeMultiplier: normalizeBalanceRechargeMultiplier(pcParseFloat(vals[SettingBalanceRechargeMult], defaultBalanceRechargeMultiplier)),
 		RechargeBonusEnabled:      vals[SettingRechargeBonusEnabled] == "true",
 		RechargeBonusPercent:      normalizeRechargeBonusPercent(pcParseFloat(vals[SettingRechargeBonusPercent], 0)),
+		RechargeBonusFirstOnly:    vals[SettingRechargeBonusFirstOnly] == "true",
 		SubscriptionUSDToCNYRate:  normalizeSubscriptionUSDToCNYRate(pcParseFloat(vals[SettingSubscriptionUSDToCNYRate], 0)),
 		RechargeFeeRate:           pcParseFloat(vals[SettingRechargeFeeRate], 0),
 		LoadBalanceStrategy:       vals[SettingLoadBalanceStrategy],
@@ -392,6 +397,9 @@ func (s *PaymentConfigService) UpdatePaymentConfig(ctx context.Context, req Upda
 	}
 	if req.RechargeBonusPercent != nil {
 		m[SettingRechargeBonusPercent] = formatNonNegativeFloat(req.RechargeBonusPercent)
+	}
+	if req.RechargeBonusFirstOnly != nil {
+		m[SettingRechargeBonusFirstOnly] = formatBoolOrEmpty(req.RechargeBonusFirstOnly)
 	}
 	if req.SubscriptionUSDToCNYRate != nil {
 		m[SettingSubscriptionUSDToCNYRate] = formatPositiveFloatExact(req.SubscriptionUSDToCNYRate)

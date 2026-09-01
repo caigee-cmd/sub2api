@@ -66,6 +66,16 @@ func calculateCreditedBalanceWithBonus(paymentAmount, multiplier float64, bonusE
 	return applyRechargeBonus(base, effectiveRechargeBonusPercent(bonusEnabled, bonusPercent))
 }
 
+func RechargeBonusApplies(enabled, firstOnly, isFirstRecharge bool) bool {
+	if !enabled {
+		return false
+	}
+	if firstOnly {
+		return isFirstRecharge
+	}
+	return true
+}
+
 func calculateGatewayRefundAmount(orderAmount, payAmount, refundAmount float64, currency string) float64 {
 	if orderAmount <= 0 || payAmount <= 0 || refundAmount <= 0 {
 		return 0

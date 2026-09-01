@@ -699,6 +699,8 @@ export default {
         rechargeBonusPercent: '赠送比例',
         rechargeBonusPercentHint: '支付成功后额外赠送的百分比。20 表示充 10 到账 12',
         rechargeBonusPreview: '预览：支付 100，到账 {amount}',
+        rechargeBonusFirstOnly: '仅首次充值',
+        rechargeBonusFirstOnlyHint: '开启后，只有用户第一笔有效余额充值享受赠送',
         subscriptionUsdToCnyRate: '订阅 CNY 换算汇率',
         subscriptionUsdToCnyRateHint:
           'CNY 支付通道下，套餐每 1 USD 价格收取多少 CNY（如 7.15）。0 或留空 = 不换算，订阅按 price 数值直接收款。启用后所有套餐 price 必须按 USD 定价',

@@ -72,7 +72,15 @@ func (s *PaymentService) CreateOrder(ctx context.Context, req CreateOrderRequest
 			limitAmount = upgradeProration.Payable
 		}
 	} else if req.OrderType == payment.OrderTypeBalance {
-		orderAmount = calculateCreditedBalanceWithBonus(req.Amount, cfg.BalanceRechargeMultiplier, cfg.RechargeBonusEnabled, cfg.RechargeBonusPercent)
+		bonusEnabled := cfg.RechargeBonusEnabled
+		if cfg.RechargeBonusFirstOnly {
+			isFirst, firstErr := s.IsFirstBalanceRecharge(ctx, req.UserID)
+			if firstErr != nil {
+				return nil, firstErr
+			}
+			bonusEnabled = RechargeBonusApplies(cfg.RechargeBonusEnabled, true, isFirst)
+		}
+		orderAmount = calculateCreditedBalanceWithBonus(req.Amount, cfg.BalanceRechargeMultiplier, bonusEnabled, cfg.RechargeBonusPercent)
 	}
 	feeRate := cfg.RechargeFeeRate
 	methodCurrency := payment.DefaultPaymentCurrency
@@ -267,6 +275,23 @@ func (s *PaymentService) allocateOutTradeNo(ctx context.Context, tx *dbent.Tx) (
 		}
 	}
 	return "", fmt.Errorf("generate unique out_trade_no: exhausted %d attempts", maxAttempts)
+}
+
+func (s *PaymentService) IsFirstBalanceRecharge(ctx context.Context, userID int64) (bool, error) {
+	if s == nil || s.entClient == nil {
+		return false, fmt.Errorf("payment service is not initialized")
+	}
+	exists, err := s.entClient.PaymentOrder.Query().
+		Where(
+			paymentorder.UserIDEQ(userID),
+			paymentorder.OrderTypeEQ(payment.OrderTypeBalance),
+			paymentorder.StatusNotIn(OrderStatusCancelled, OrderStatusExpired, OrderStatusFailed),
+		).
+		Exist(ctx)
+	if err != nil {
+		return false, fmt.Errorf("check first balance recharge: %w", err)
+	}
+	return !exists, nil
 }
 
 func (s *PaymentService) checkPendingLimit(ctx context.Context, tx *dbent.Tx, userID int64, max int) error {
