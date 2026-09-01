@@ -487,6 +487,7 @@ const baseSettingsResponse = {
   payment_recharge_bonus_enabled: false,
   payment_recharge_bonus_percent: 0,
   payment_recharge_bonus_first_only: false,
+  payment_recharge_bonus_max_amount: 0,
   payment_subscription_usd_to_cny_rate: 0,
   payment_recharge_fee_rate: 0,
   payment_load_balance_strategy: "round-robin",

@@ -162,6 +162,7 @@ func (h *PaymentHandler) GetCheckoutInfo(c *gin.Context) {
 		RechargeBonusEnabled:          bonusEnabled,
 		RechargeBonusPercent:          cfg.RechargeBonusPercent,
 		RechargeBonusFirstOnly:        cfg.RechargeBonusFirstOnly,
+		RechargeBonusMaxAmount:        cfg.RechargeBonusMaxAmount,
 		SubscriptionUSDToCNYRate:      cfg.SubscriptionUSDToCNYRate,
 		RechargeFeeRate:               cfg.RechargeFeeRate,
 		HelpText:                      cfg.HelpText,
@@ -182,6 +183,7 @@ type checkoutInfoResponse struct {
 	RechargeBonusEnabled          bool                            `json:"recharge_bonus_enabled"`
 	RechargeBonusPercent          float64                         `json:"recharge_bonus_percent"`
 	RechargeBonusFirstOnly        bool                            `json:"recharge_bonus_first_only"`
+	RechargeBonusMaxAmount        float64                         `json:"recharge_bonus_max_amount"`
 	SubscriptionUSDToCNYRate      float64                         `json:"subscription_usd_to_cny_rate"`
 	RechargeFeeRate               float64                         `json:"recharge_fee_rate"`
 	HelpText                      string                          `json:"help_text"`

@@ -310,6 +310,7 @@ type UpdateSettingsRequest struct {
 	PaymentRechargeBonusEnabled      *bool    `json:"payment_recharge_bonus_enabled"`
 	PaymentRechargeBonusPercent      *float64 `json:"payment_recharge_bonus_percent"`
 	PaymentRechargeBonusFirstOnly    *bool    `json:"payment_recharge_bonus_first_only"`
+	PaymentRechargeBonusMaxAmount    *float64 `json:"payment_recharge_bonus_max_amount"`
 	PaymentSubscriptionUSDToCNYRate  *float64 `json:"payment_subscription_usd_to_cny_rate"`
 	PaymentRechargeFeeRate           *float64 `json:"payment_recharge_fee_rate"`
 	PaymentLoadBalanceStrat          *string  `json:"payment_load_balance_strategy"`
@@ -2069,6 +2070,7 @@ func (h *SettingHandler) UpdateSettings(c *gin.Context) {
 			RechargeBonusEnabled:          req.PaymentRechargeBonusEnabled,
 			RechargeBonusPercent:          req.PaymentRechargeBonusPercent,
 			RechargeBonusFirstOnly:        req.PaymentRechargeBonusFirstOnly,
+			RechargeBonusMaxAmount:        req.PaymentRechargeBonusMaxAmount,
 			SubscriptionUSDToCNYRate:      req.PaymentSubscriptionUSDToCNYRate,
 			RechargeFeeRate:               req.PaymentRechargeFeeRate,
 			LoadBalanceStrategy:           req.PaymentLoadBalanceStrat,
@@ -2348,6 +2350,7 @@ func (h *SettingHandler) UpdateSettings(c *gin.Context) {
 		PaymentRechargeBonusEnabled:                            updatedPaymentCfg.RechargeBonusEnabled,
 		PaymentRechargeBonusPercent:                            updatedPaymentCfg.RechargeBonusPercent,
 		PaymentRechargeBonusFirstOnly:                          updatedPaymentCfg.RechargeBonusFirstOnly,
+		PaymentRechargeBonusMaxAmount:                          updatedPaymentCfg.RechargeBonusMaxAmount,
 		PaymentSubscriptionUSDToCNYRate:                        updatedPaymentCfg.SubscriptionUSDToCNYRate,
 		PaymentRechargeFeeRate:                                 updatedPaymentCfg.RechargeFeeRate,
 		PaymentLoadBalanceStrat:                                updatedPaymentCfg.LoadBalanceStrategy,
@@ -2423,6 +2426,7 @@ func hasPaymentFields(req UpdateSettingsRequest) bool {
 		req.PaymentEnabledTypes != nil || req.PaymentBalanceDisabled != nil ||
 		req.PaymentBalanceRechargeMultiplier != nil || req.PaymentRechargeBonusEnabled != nil ||
 		req.PaymentRechargeBonusPercent != nil || req.PaymentRechargeBonusFirstOnly != nil ||
+		req.PaymentRechargeBonusMaxAmount != nil ||
 		req.PaymentSubscriptionUSDToCNYRate != nil ||
 		req.PaymentRechargeFeeRate != nil ||
 		req.PaymentLoadBalanceStrat != nil || req.PaymentProductNamePrefix != nil ||

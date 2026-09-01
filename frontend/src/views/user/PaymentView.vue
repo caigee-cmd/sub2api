@@ -506,7 +506,7 @@ function onPaymentSettled() {
 // All checkout data from single API call
 const checkout = ref<CheckoutInfoResponse>({
   methods: {}, global_min: 0, global_max: 0,
-  plans: [], balance_disabled: false, balance_recharge_multiplier: 1, recharge_bonus_enabled: false, recharge_bonus_percent: 0, recharge_bonus_first_only: false, subscription_usd_to_cny_rate: 0, recharge_fee_rate: 0, help_text: '', help_image_url: '', stripe_publishable_key: '',
+  plans: [], balance_disabled: false, balance_recharge_multiplier: 1, recharge_bonus_enabled: false, recharge_bonus_percent: 0, recharge_bonus_first_only: false, recharge_bonus_max_amount: 0, subscription_usd_to_cny_rate: 0, recharge_fee_rate: 0, help_text: '', help_image_url: '', stripe_publishable_key: '',
 })
 
 const tabs = computed(() => {
@@ -533,9 +533,17 @@ const rechargeBonusPercent = computed(() => {
   const percent = checkout.value.recharge_bonus_percent
   return Number.isFinite(percent) && percent > 0 ? percent : 0
 })
+const rechargeBonusMaxAmount = computed(() => {
+  const maxAmount = checkout.value.recharge_bonus_max_amount
+  return Number.isFinite(maxAmount) && maxAmount > 0 ? maxAmount : 0
+})
 const creditedAmount = computed(() => {
   const base = validAmount.value * balanceRechargeMultiplier.value
-  return Math.round(base * (1 + rechargeBonusPercent.value / 100) * 100) / 100
+  let bonus = Math.round(base * (rechargeBonusPercent.value / 100) * 100) / 100
+  if (rechargeBonusMaxAmount.value > 0 && bonus > rechargeBonusMaxAmount.value) {
+    bonus = rechargeBonusMaxAmount.value
+  }
+  return Math.round((base + bonus) * 100) / 100
 })
 const hasRechargeBonus = computed(() => rechargeBonusPercent.value > 0)
 const showCreditedPreview = computed(() => balanceRechargeMultiplier.value !== 1 || hasRechargeBonus.value)

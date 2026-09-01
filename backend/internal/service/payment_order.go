@@ -80,7 +80,7 @@ func (s *PaymentService) CreateOrder(ctx context.Context, req CreateOrderRequest
 			}
 			bonusEnabled = RechargeBonusApplies(cfg.RechargeBonusEnabled, true, isFirst)
 		}
-		orderAmount = calculateCreditedBalanceWithBonus(req.Amount, cfg.BalanceRechargeMultiplier, bonusEnabled, cfg.RechargeBonusPercent)
+		orderAmount = calculateCreditedBalanceWithBonus(req.Amount, cfg.BalanceRechargeMultiplier, bonusEnabled, cfg.RechargeBonusPercent, cfg.RechargeBonusMaxAmount)
 	}
 	feeRate := cfg.RechargeFeeRate
 	methodCurrency := payment.DefaultPaymentCurrency

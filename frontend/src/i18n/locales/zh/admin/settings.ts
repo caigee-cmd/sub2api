@@ -701,6 +701,8 @@ export default {
         rechargeBonusPreview: '预览：支付 100，到账 {amount}',
         rechargeBonusFirstOnly: '仅首次充值',
         rechargeBonusFirstOnlyHint: '开启后，只有用户第一笔有效余额充值享受赠送',
+        rechargeBonusMaxAmount: '赠送上限',
+        rechargeBonusMaxAmountHint: '单笔最多额外赠送多少 USD。0 = 不封顶。比例 100% + 上限 30 即为充多少送多少，最高 $30',
         subscriptionUsdToCnyRate: '订阅 CNY 换算汇率',
         subscriptionUsdToCnyRateHint:
           'CNY 支付通道下，套餐每 1 USD 价格收取多少 CNY（如 7.15）。0 或留空 = 不换算，订阅按 price 数值直接收款。启用后所有套餐 price 必须按 USD 定价',

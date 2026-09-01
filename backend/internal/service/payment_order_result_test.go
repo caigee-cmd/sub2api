@@ -294,24 +294,29 @@ func TestCalculateCreditedBalanceStillUsesRechargeMultiplier(t *testing.T) {
 func TestCalculateCreditedBalanceWithBonus(t *testing.T) {
 	t.Parallel()
 
-	got := calculateCreditedBalanceWithBonus(10, 1, true, 20)
+	got := calculateCreditedBalanceWithBonus(10, 1, true, 20, 0)
 	if got != 12 {
 		t.Fatalf("credited with 20%% bonus = %v, want 12", got)
 	}
 
-	got = calculateCreditedBalanceWithBonus(10, 0.14, true, 50)
+	got = calculateCreditedBalanceWithBonus(10, 0.14, true, 50, 0)
 	if got != 2.1 {
 		t.Fatalf("credited with FX + 50%% bonus = %v, want 2.1", got)
 	}
 
-	got = calculateCreditedBalanceWithBonus(10, 1, false, 20)
+	got = calculateCreditedBalanceWithBonus(10, 1, false, 20, 0)
 	if got != 10 {
 		t.Fatalf("disabled bonus should not change credit = %v, want 10", got)
 	}
 
-	got = calculateCreditedBalanceWithBonus(10, 1, true, 0)
+	got = calculateCreditedBalanceWithBonus(10, 1, true, 0, 30)
 	if got != 10 {
 		t.Fatalf("zero percent should not change credit = %v, want 10", got)
+	}
+
+	got = calculateCreditedBalanceWithBonus(50, 1, true, 100, 30)
+	if got != 80 {
+		t.Fatalf("match-and-cap bonus = %v, want 80", got)
 	}
 }
 

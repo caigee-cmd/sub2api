@@ -50,20 +50,33 @@ func effectiveRechargeBonusPercent(enabled bool, percent float64) float64 {
 	return normalizeRechargeBonusPercent(percent)
 }
 
-func applyRechargeBonus(baseAmount, percent float64) float64 {
-	pct := normalizeRechargeBonusPercent(percent)
-	if baseAmount <= 0 || pct <= 0 {
-		return decimal.NewFromFloat(baseAmount).Round(2).InexactFloat64()
+func normalizeRechargeBonusMaxAmount(maxAmount float64) float64 {
+	if math.IsNaN(maxAmount) || math.IsInf(maxAmount, 0) || maxAmount < 0 {
+		return 0
 	}
-	return decimal.NewFromFloat(baseAmount).
-		Mul(decimal.NewFromFloat(1).Add(decimal.NewFromFloat(pct).Div(decimal.NewFromInt(100)))).
-		Round(2).
-		InexactFloat64()
+	return maxAmount
 }
 
-func calculateCreditedBalanceWithBonus(paymentAmount, multiplier float64, bonusEnabled bool, bonusPercent float64) float64 {
+func applyRechargeBonus(baseAmount, percent, maxAmount float64) float64 {
+	pct := normalizeRechargeBonusPercent(percent)
+	base := decimal.NewFromFloat(baseAmount).Round(2)
+	if baseAmount <= 0 || pct <= 0 {
+		return base.InexactFloat64()
+	}
+	bonus := base.Mul(decimal.NewFromFloat(pct).Div(decimal.NewFromInt(100))).Round(2)
+	cap := normalizeRechargeBonusMaxAmount(maxAmount)
+	if cap > 0 {
+		maxBonus := decimal.NewFromFloat(cap).Round(2)
+		if bonus.GreaterThan(maxBonus) {
+			bonus = maxBonus
+		}
+	}
+	return base.Add(bonus).Round(2).InexactFloat64()
+}
+
+func calculateCreditedBalanceWithBonus(paymentAmount, multiplier float64, bonusEnabled bool, bonusPercent, maxAmount float64) float64 {
 	base := calculateCreditedBalance(paymentAmount, multiplier)
-	return applyRechargeBonus(base, effectiveRechargeBonusPercent(bonusEnabled, bonusPercent))
+	return applyRechargeBonus(base, effectiveRechargeBonusPercent(bonusEnabled, bonusPercent), maxAmount)
 }
 
 func RechargeBonusApplies(enabled, firstOnly, isFirstRecharge bool) bool {

@@ -7943,6 +7943,33 @@
                         })
                       }}
                     </p>
+                    <div class="mt-3">
+                      <label class="input-label">{{
+                        t("admin.settings.payment.rechargeBonusMaxAmount")
+                      }}</label>
+                      <input
+                        :value="form.payment_recharge_bonus_max_amount || ''"
+                        @input="
+                          form.payment_recharge_bonus_max_amount = Math.max(
+                            0,
+                            Math.round(
+                              parseFloat(
+                                ($event.target as HTMLInputElement).value ||
+                                  '0',
+                              ) * 100,
+                            ) / 100,
+                          )
+                        "
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        class="input"
+                        :placeholder="t('admin.settings.payment.noLimit')"
+                      />
+                      <p class="mt-0.5 text-xs text-gray-400">
+                        {{ t("admin.settings.payment.rechargeBonusMaxAmountHint") }}
+                      </p>
+                    </div>
                     <div class="mt-3 flex items-center justify-between">
                       <div>
                         <label class="font-medium text-gray-900 dark:text-white">{{
@@ -9642,6 +9669,7 @@ const form = reactive<SettingsForm>({
   payment_recharge_bonus_enabled: false,
   payment_recharge_bonus_percent: 0,
   payment_recharge_bonus_first_only: false,
+  payment_recharge_bonus_max_amount: 0,
   payment_subscription_usd_to_cny_rate: 0,
   payment_recharge_fee_rate: 0,
   payment_enabled_types: [],
@@ -11488,6 +11516,8 @@ async function saveSettings() {
       payment_recharge_bonus_percent:
         Number(form.payment_recharge_bonus_percent) || 0,
       payment_recharge_bonus_first_only: form.payment_recharge_bonus_first_only,
+      payment_recharge_bonus_max_amount:
+        Number(form.payment_recharge_bonus_max_amount) || 0,
       payment_subscription_usd_to_cny_rate:
         Number(form.payment_subscription_usd_to_cny_rate) || 0,
       payment_recharge_fee_rate: Number(form.payment_recharge_fee_rate) || 0,

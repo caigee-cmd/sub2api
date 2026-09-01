@@ -706,6 +706,8 @@ export default {
         rechargeBonusPreview: 'Preview: pay 100, credited {amount}',
         rechargeBonusFirstOnly: 'First recharge only',
         rechargeBonusFirstOnlyHint: 'When enabled, only the user’s first valid balance top-up receives the bonus',
+        rechargeBonusMaxAmount: 'Bonus cap',
+        rechargeBonusMaxAmountHint: 'Maximum extra USD credited per top-up. 0 = no cap. 100% + $30 = match the payment up to $30',
         subscriptionUsdToCnyRate: 'Subscription USD to CNY Rate',
         subscriptionUsdToCnyRateHint:
           'CNY charged per 1 USD of plan price on CNY channels (e.g. 7.15). 0 or empty = disabled, plan price is charged as-is. When enabled, all plan prices must be set in USD',

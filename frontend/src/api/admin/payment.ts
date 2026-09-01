@@ -27,6 +27,7 @@ export interface AdminPaymentConfig {
   recharge_bonus_enabled: boolean
   recharge_bonus_percent: number
   recharge_bonus_first_only: boolean
+  recharge_bonus_max_amount: number
   subscription_usd_to_cny_rate: number
   recharge_fee_rate: number
   load_balance_strategy: string
@@ -50,6 +51,7 @@ export interface UpdatePaymentConfigRequest {
   recharge_bonus_enabled?: boolean
   recharge_bonus_percent?: number
   recharge_bonus_first_only?: boolean
+  recharge_bonus_max_amount?: number
   subscription_usd_to_cny_rate?: number
   recharge_fee_rate?: number
   load_balance_strategy?: string
