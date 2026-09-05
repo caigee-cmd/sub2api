@@ -89,6 +89,12 @@ type OpenAIEndpointCapability string
 
 const openAILongContextBillingEnabledKey = "openai_long_context_billing_enabled"
 
+	// UnifyClientErrorMessageKey is an optional per-account override stored in
+	// accounts.extra. When true, gateway responses keep the original HTTP status
+	// and error type/code, but replace the client-visible message with a generic
+	// status-based sentence. Default (absent/false) preserves current behavior.
+	const UnifyClientErrorMessageKey = "unify_client_error_message"
+
 const (
 	OpenAIEndpointCapabilityChatCompletions OpenAIEndpointCapability = "chat_completions"
 	OpenAIEndpointCapabilityEmbeddings      OpenAIEndpointCapability = "embeddings"
@@ -1324,6 +1330,31 @@ func (a *Account) IsOpenAILongContextBillingEnabled() bool {
 	}
 	enabled, ok := a.Extra[openAILongContextBillingEnabledKey].(bool)
 	return ok && enabled
+}
+
+func extraBoolTrue(extra map[string]any, key string) bool {
+	if extra == nil {
+		return false
+	}
+	switch value := extra[key].(type) {
+	case bool:
+		return value
+	case string:
+		switch strings.TrimSpace(strings.ToLower(value)) {
+		case "1", "true", "yes", "on":
+			return true
+		}
+	}
+	return false
+}
+
+// UnifyClientErrorMessage reports whether this account should hide upstream
+// error details from clients. Default is false (current passthrough behavior).
+func (a *Account) UnifyClientErrorMessage() bool {
+	if a == nil {
+		return false
+	}
+	return extraBoolTrue(a.Extra, UnifyClientErrorMessageKey)
 }
 
 func (a *Account) IsAnthropic() bool {

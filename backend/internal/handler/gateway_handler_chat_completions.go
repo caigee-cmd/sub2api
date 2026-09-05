@@ -204,7 +204,7 @@ func (h *GatewayHandler) ChatCompletions(c *gin.Context) {
 			}
 		}
 		account := selection.Account
-		setOpsSelectedAccount(c, account.ID, account.Platform)
+		setOpsSelectedAccountWithUnify(c, account)
 
 		// 4. Acquire account concurrency slot
 		accountReleaseFunc := selection.ReleaseFunc
@@ -369,6 +369,7 @@ func (h *GatewayHandler) ChatCompletions(c *gin.Context) {
 // chatCompletionsErrorResponse writes an error in OpenAI Chat Completions format.
 func (h *GatewayHandler) chatCompletionsErrorResponse(c *gin.Context, status int, errType, message string) {
 	message = logredact.RedactUpstreamURL(message)
+	message = maybeUnifyClientErrorMessage(c, status, message)
 	c.JSON(status, gin.H{
 		"error": gin.H{
 			"type":    errType,

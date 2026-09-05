@@ -2010,6 +2010,87 @@
         />
       </div>
 
+      <div class="border-t border-gray-200 pt-4 dark:border-dark-600">
+        <div class="flex items-center justify-between gap-4">
+          <div>
+            <label class="input-label mb-0">{{ t('admin.accounts.unifyClientErrorMessage') }}</label>
+            <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+              {{ t('admin.accounts.unifyClientErrorMessageDesc') }}
+            </p>
+          </div>
+          <button
+            type="button"
+            data-testid="unify-client-error-message-toggle"
+            role="switch"
+            :aria-checked="unifyClientErrorMessageEnabled"
+            @click="unifyClientErrorMessageEnabled = !unifyClientErrorMessageEnabled"
+            :class="[
+              'relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2',
+              unifyClientErrorMessageEnabled ? 'bg-primary-600' : 'bg-gray-200 dark:bg-dark-600'
+            ]"
+          >
+            <span
+              :class="[
+                'pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out',
+                unifyClientErrorMessageEnabled ? 'translate-x-5' : 'translate-x-0'
+              ]"
+            />
+          </button>
+        </div>
+      </div>
+
+
+      <div class="border-t border-gray-200 pt-4 dark:border-dark-600 space-y-3">
+        <div>
+          <label class="input-label mb-0">{{ t('admin.accounts.identitySystemPrompts') }}</label>
+          <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+            {{ t('admin.accounts.identitySystemPromptsDesc') }}
+          </p>
+        </div>
+        <div v-if="identitySystemPromptRows.length > 0" class="space-y-3">
+          <div
+            v-for="(row, index) in identitySystemPromptRows"
+            :key="'identity-prompt-' + index"
+            class="space-y-2 rounded-lg border border-gray-200 p-3 dark:border-dark-600"
+          >
+            <div class="flex items-center gap-2">
+              <input
+                v-model="row.model"
+                type="text"
+                class="input flex-1"
+                :placeholder="t('admin.accounts.identitySystemPromptModelPlaceholder')"
+                :data-testid="'identity-system-prompt-model-' + index"
+              />
+              <button
+                type="button"
+                class="rounded-lg p-2 text-red-500 transition-colors hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-900/20"
+                :data-testid="'identity-system-prompt-remove-' + index"
+                @click="identitySystemPromptRows.splice(index, 1)"
+              >
+                <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                </svg>
+              </button>
+            </div>
+            <textarea
+              v-model="row.prompt"
+              rows="4"
+              class="input w-full font-mono text-xs"
+              :placeholder="t('admin.accounts.identitySystemPromptTextPlaceholder')"
+              :data-testid="'identity-system-prompt-text-' + index"
+            />
+          </div>
+        </div>
+        <button
+          type="button"
+          class="btn btn-secondary text-sm"
+          data-testid="identity-system-prompt-add"
+          @click="identitySystemPromptRows.push({ model: '', prompt: '' })"
+        >
+          {{ t('admin.accounts.identitySystemPromptAdd') }}
+        </button>
+      </div>
+
       <!-- OpenAI API 长上下文计费开关 -->
       <div
         v-if="account?.platform === 'openai' && !isSparkShadow && !hideAccountLongContextBilling && (account?.type === 'oauth' || account?.type === 'setup-token' || account?.type === 'apikey')"
@@ -3305,6 +3386,38 @@ const openaiPassthroughEnabled = ref(false)
 // OpenAI Codex namespace 工具摊平兼容开关（仅 OAuth），缺省关闭即原样保留
 const openaiFlattenNamespacesEnabled = ref(false)
 const openAILongContextBillingEnabled = ref(false)
+interface IdentitySystemPromptRow {
+  model: string
+  prompt: string
+}
+
+const unifyClientErrorMessageEnabled = ref(false)
+const identitySystemPromptRows = ref<IdentitySystemPromptRow[]>([])
+
+function parseIdentitySystemPromptRows(raw: unknown): IdentitySystemPromptRow[] {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return []
+  return Object.entries(raw as Record<string, unknown>)
+    .filter(([, prompt]) => typeof prompt === 'string')
+    .map(([model, prompt]) => ({ model, prompt: prompt as string }))
+}
+
+function buildIdentitySystemPrompts(rows: IdentitySystemPromptRow[]): Record<string, string> | undefined {
+  const mapping: Record<string, string> = {}
+  for (const row of rows) {
+    const model = row.model.trim()
+    const prompt = row.prompt.trim()
+    if (!model || !prompt) continue
+    mapping[model] = row.prompt
+  }
+  return Object.keys(mapping).length > 0 ? mapping : undefined
+}
+
+function applyIdentitySystemPrompts(extra: Record<string, unknown>) {
+  const mapping = buildIdentitySystemPrompts(identitySystemPromptRows.value)
+  if (mapping) extra.identity_system_prompts = mapping
+  else delete extra.identity_system_prompts
+}
+
 // OpenAI 订阅档位（Plus/Pro/Free）手动覆盖值,存于 credentials.plan_type;'' 表示清空/自动识别
 const editPlanType = ref<string>('')
 const openAICompactMode = ref<OpenAICompactMode>('auto')
@@ -3814,8 +3927,10 @@ const syncFormFromAccount = (newAccount: Account | null) => {
   // Load mixed scheduling setting (only for antigravity accounts)
   mixedScheduling.value = false
   allowOverages.value = false
-	const extra = newAccount.extra as Record<string, unknown> | undefined
-	mixedScheduling.value = extra?.mixed_scheduling === true
+		const extra = newAccount.extra as Record<string, unknown> | undefined
+		unifyClientErrorMessageEnabled.value = extra?.unify_client_error_message === true
+		identitySystemPromptRows.value = parseIdentitySystemPromptRows(extra?.identity_system_prompts)
+		mixedScheduling.value = extra?.mixed_scheduling === true
 	allowOverages.value = extra?.allow_overages === true
 	autoPause5hThreshold.value = typeof extra?.auto_pause_5h_threshold === 'number' ? extra.auto_pause_5h_threshold * 100 : null
 	autoPause7dThreshold.value = typeof extra?.auto_pause_7d_threshold === 'number' ? extra.auto_pause_7d_threshold * 100 : null
@@ -5432,6 +5547,19 @@ const handleSubmit = async () => {
       }
       // Quota notify config
       writeQuotaNotifyToExtra(newExtra, 'update')
+      updatePayload.extra = newExtra
+    }
+
+    {
+      const currentExtra = (updatePayload.extra as Record<string, unknown>) ||
+        (props.account.extra as Record<string, unknown>) || {}
+      const newExtra: Record<string, unknown> = { ...currentExtra }
+      if (unifyClientErrorMessageEnabled.value) {
+        newExtra.unify_client_error_message = true
+      } else {
+        delete newExtra.unify_client_error_message
+      }
+      applyIdentitySystemPrompts(newExtra)
       updatePayload.extra = newExtra
     }
 

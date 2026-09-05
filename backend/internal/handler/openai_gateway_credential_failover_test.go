@@ -118,13 +118,47 @@ func TestOpenAICapacityFailoverExhaustionPreservesMessageAsServerError(t *testin
 		require.Equal(t, message, gjson.Get(recorder.Body.String(), "error.message").String())
 	})
 
-	t.Run("anthropic_compat", func(t *testing.T) {
+		t.Run("anthropic_compat", func(t *testing.T) {
+			recorder := httptest.NewRecorder()
+			c, _ := gin.CreateTestContext(recorder)
+			(&OpenAIGatewayHandler{}).handleAnthropicFailoverExhausted(c, failoverErr, false)
+			require.Equal(t, http.StatusServiceUnavailable, recorder.Code)
+			require.Equal(t, "api_error", gjson.Get(recorder.Body.String(), "error.type").String())
+			require.Equal(t, message, gjson.Get(recorder.Body.String(), "error.message").String())
+		})
+	}
+
+func TestUnifyClientErrorMessageKeepsCodeAndHidesUpstreamDetails(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	raw := "auth_unavailable: no auth available (providers=codex, model=gpt-5.6-terra; last upstream error: server_is_overloaded: Our servers are currently overloaded. Please try again later.)"
+	failoverErr := &service.UpstreamFailoverError{
+		StatusCode:             http.StatusServiceUnavailable,
+		ResponseBody:           []byte(`{"error":{"message":"` + raw + `","type":"server_error"}}`),
+		RetryableOnSameAccount: true,
+		RequestScopedTransient: true,
+		ClientStatusCode:       http.StatusServiceUnavailable,
+		ClientMessage:          raw,
+	}
+	want := "Upstream service temporarily unavailable, please retry later"
+
+	t.Run("native_openai", func(t *testing.T) {
 		recorder := httptest.NewRecorder()
 		c, _ := gin.CreateTestContext(recorder)
-		(&OpenAIGatewayHandler{}).handleAnthropicFailoverExhausted(c, failoverErr, false)
+		c.Set(opsUnifyClientErrorMessageKey, true)
+		(&OpenAIGatewayHandler{}).handleFailoverExhausted(c, failoverErr, false)
 		require.Equal(t, http.StatusServiceUnavailable, recorder.Code)
-		require.Equal(t, "api_error", gjson.Get(recorder.Body.String(), "error.type").String())
-		require.Equal(t, message, gjson.Get(recorder.Body.String(), "error.message").String())
+		require.Equal(t, "server_error", gjson.Get(recorder.Body.String(), "error.type").String())
+		require.Equal(t, want, gjson.Get(recorder.Body.String(), "error.message").String())
+		require.NotContains(t, recorder.Body.String(), "gpt-5.6-terra")
+		require.NotContains(t, recorder.Body.String(), "auth_unavailable")
+	})
+
+	t.Run("default_passthrough", func(t *testing.T) {
+		recorder := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(recorder)
+		(&OpenAIGatewayHandler{}).handleFailoverExhausted(c, failoverErr, false)
+		require.Equal(t, http.StatusServiceUnavailable, recorder.Code)
+		require.Equal(t, raw, gjson.Get(recorder.Body.String(), "error.message").String())
 	})
 }
 

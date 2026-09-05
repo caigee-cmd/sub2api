@@ -29,6 +29,7 @@ const (
 	opsModelKey                  = "ops_model"
 	opsStreamKey                 = "ops_stream"
 	opsAccountIDKey              = "ops_account_id"
+	opsUnifyClientErrorMessageKey = "ops_unify_client_error_message"
 	opsRoutingCapacityLimitedKey = "ops_routing_capacity_limited"
 	opsDedicatedErrorRecordedKey = "ops_dedicated_error_recorded"
 
@@ -480,6 +481,57 @@ func setOpsSelectedAccount(c *gin.Context, accountID int64, platform ...string) 
 		}
 		c.Request = c.Request.WithContext(ctx)
 	}
+}
+
+func setOpsSelectedAccountWithUnify(c *gin.Context, account *service.Account) {
+	if c == nil || account == nil {
+		return
+	}
+	setOpsSelectedAccount(c, account.ID, account.Platform)
+	if account.UnifyClientErrorMessage() {
+		c.Set(opsUnifyClientErrorMessageKey, true)
+	} else {
+		c.Set(opsUnifyClientErrorMessageKey, false)
+	}
+}
+
+func unifyClientErrorMessageEnabled(c *gin.Context) bool {
+	if c == nil {
+		return false
+	}
+	if v, ok := c.Get(opsUnifyClientErrorMessageKey); ok {
+		enabled, _ := v.(bool)
+		return enabled
+	}
+	return false
+}
+
+func unifiedClientErrorMessage(status int) string {
+	switch status {
+	case http.StatusTooManyRequests:
+		return "Rate limit exceeded, please retry later"
+	case http.StatusServiceUnavailable, http.StatusBadGateway, http.StatusGatewayTimeout:
+		return "Upstream service temporarily unavailable, please retry later"
+	case http.StatusUnauthorized, http.StatusForbidden:
+		return "Request failed, please retry later"
+	case http.StatusBadRequest, http.StatusUnprocessableEntity, http.StatusRequestEntityTooLarge:
+		return "Invalid request"
+	default:
+		if status >= 500 {
+			return "Upstream service temporarily unavailable, please retry later"
+		}
+		if status >= 400 {
+			return "Request failed, please retry later"
+		}
+		return "Request failed, please retry later"
+	}
+}
+
+func maybeUnifyClientErrorMessage(c *gin.Context, status int, message string) string {
+	if !unifyClientErrorMessageEnabled(c) {
+		return message
+	}
+	return unifiedClientErrorMessage(status)
 }
 
 func markOpsRoutingCapacityLimited(c *gin.Context) {

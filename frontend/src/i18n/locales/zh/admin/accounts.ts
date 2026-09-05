@@ -81,6 +81,15 @@ export default {
       notes: '备注',
       notesPlaceholder: '请输入备注',
       notesHint: '备注可选',
+      unifyClientErrorMessage: '统一客户端异常信息',
+      unifyClientErrorMessageDesc:
+        '默认关闭，保持现有透传。开启后 HTTP 状态码和错误码不变，仅把返回给用户的 message 换成简短通用文案，避免暴露内部模型名和上游原文。运维日志仍记录原始错误。',
+      identitySystemPrompts: '自定义身份提示词',
+      identitySystemPromptsDesc:
+        '按客户端请求的模型名注入 system prompt，和模型映射无关。例如请求 glm-5.2 时注入 GLM 身份，不暴露底层实际模型。留空则不注入。',
+      identitySystemPromptModelPlaceholder: '客户端模型名，如 glm-5.2',
+      identitySystemPromptTextPlaceholder: '注入到请求最前面的 system prompt',
+      identitySystemPromptAdd: '添加提示词',
       // Filter options
       allPlatforms: '全部平台',
       allTypes: '全部类型',

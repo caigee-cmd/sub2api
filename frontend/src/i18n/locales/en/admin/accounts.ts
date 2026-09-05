@@ -82,6 +82,15 @@ export default {
       notes: 'Notes',
       notesPlaceholder: 'Enter notes',
       notesHint: 'Notes are optional',
+      unifyClientErrorMessage: 'Unify client error messages',
+      unifyClientErrorMessageDesc:
+        'Disabled by default to keep current passthrough. When enabled, HTTP status and error code stay the same, but the client-visible message is replaced with a short generic sentence so internal model names and upstream details are not leaked. Ops logs still keep the original error.',
+      identitySystemPrompts: 'Custom identity prompts',
+      identitySystemPromptsDesc:
+        'Inject a system prompt by the client-requested model name, independent of model mapping. For example, glm-5.2 can present itself as GLM without exposing the upstream model. Empty rows are not saved.',
+      identitySystemPromptModelPlaceholder: 'Client model name, e.g. glm-5.2',
+      identitySystemPromptTextPlaceholder: 'System prompt prepended to the request',
+      identitySystemPromptAdd: 'Add prompt',
       allPlatforms: 'All Platforms',
       allTypes: 'All Types',
       allStatus: 'All Status',

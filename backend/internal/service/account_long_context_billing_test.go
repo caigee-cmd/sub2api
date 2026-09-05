@@ -11,6 +11,26 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestAccountUnifyClientErrorMessage(t *testing.T) {
+	tests := []struct {
+		name    string
+		account *Account
+		want    bool
+	}{
+		{name: "nil account is disabled", account: nil, want: false},
+		{name: "missing extra defaults disabled", account: &Account{Platform: PlatformOpenAI}, want: false},
+		{name: "explicit true is enabled", account: &Account{Extra: map[string]any{"unify_client_error_message": true}}, want: true},
+		{name: "explicit false is disabled", account: &Account{Extra: map[string]any{"unify_client_error_message": false}}, want: false},
+		{name: "string true is enabled", account: &Account{Extra: map[string]any{"unify_client_error_message": "true"}}, want: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			require.Equal(t, tt.want, tt.account.UnifyClientErrorMessage())
+		})
+	}
+}
+
 func TestAccountIsOpenAILongContextBillingEnabled(t *testing.T) {
 	tests := []struct {
 		name    string

@@ -206,7 +206,7 @@ func (h *GatewayHandler) Responses(c *gin.Context) {
 			}
 		}
 		account := selection.Account
-		setOpsSelectedAccount(c, account.ID, account.Platform)
+		setOpsSelectedAccountWithUnify(c, account)
 
 		// 4. Acquire account concurrency slot
 		accountReleaseFunc := selection.ReleaseFunc
@@ -357,6 +357,7 @@ func (h *GatewayHandler) Responses(c *gin.Context) {
 // responsesErrorResponse writes an error in OpenAI Responses API format.
 func (h *GatewayHandler) responsesErrorResponse(c *gin.Context, status int, code, message string) {
 	message = logredact.RedactUpstreamURL(message)
+	message = maybeUnifyClientErrorMessage(c, status, message)
 	c.JSON(status, gin.H{
 		"error": gin.H{
 			"code":    code,

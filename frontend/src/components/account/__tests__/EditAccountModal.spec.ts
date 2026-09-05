@@ -612,6 +612,76 @@ describe('EditAccountModal', () => {
     })
   })
 
+  it('loads and submits identity system prompts without dropping extra keys', async () => {
+    const account = buildAccount()
+    account.extra = {
+      unify_client_error_message: true,
+      identity_system_prompts: {
+        'glm-5.2': 'You are GLM.'
+      }
+    }
+    updateAccountMock.mockReset()
+    checkMixedChannelRiskMock.mockReset()
+    checkMixedChannelRiskMock.mockResolvedValue({ has_risk: false })
+    updateAccountMock.mockResolvedValue(account)
+
+    const wrapper = mountModal(account)
+    const modelInput = wrapper.get('[data-testid="identity-system-prompt-model-0"]')
+    const promptInput = wrapper.get('[data-testid="identity-system-prompt-text-0"]')
+    expect((modelInput.element as HTMLInputElement).value).toBe('glm-5.2')
+    expect((promptInput.element as HTMLTextAreaElement).value).toBe('You are GLM.')
+
+    await promptInput.setValue('You are GLM-4.7.')
+    await wrapper.get('form#edit-account-form').trigger('submit.prevent')
+
+    expect(updateAccountMock).toHaveBeenCalledTimes(1)
+    expect(updateAccountMock.mock.calls[0]?.[1]?.extra?.unify_client_error_message).toBe(true)
+    expect(updateAccountMock.mock.calls[0]?.[1]?.extra?.identity_system_prompts).toEqual({
+      'glm-5.2': 'You are GLM-4.7.'
+    })
+  })
+
+  it('omits identity system prompts from extra when all rows are empty', async () => {
+    const account = buildAccount()
+    account.extra = {
+      identity_system_prompts: {
+        'glm-5.2': 'You are GLM.'
+      }
+    }
+    updateAccountMock.mockReset()
+    checkMixedChannelRiskMock.mockReset()
+    checkMixedChannelRiskMock.mockResolvedValue({ has_risk: false })
+    updateAccountMock.mockResolvedValue(account)
+
+    const wrapper = mountModal(account)
+    await wrapper.get('[data-testid="identity-system-prompt-remove-0"]').trigger('click')
+    await wrapper.get('form#edit-account-form').trigger('submit.prevent')
+
+    expect(updateAccountMock).toHaveBeenCalledTimes(1)
+    expect(updateAccountMock.mock.calls[0]?.[1]?.extra?.identity_system_prompts).toBeUndefined()
+  })
+
+  it('loads and submits the unify client error message toggle', async () => {
+    const account = buildAccount()
+    account.extra = {
+      unify_client_error_message: true
+    }
+    updateAccountMock.mockReset()
+    checkMixedChannelRiskMock.mockReset()
+    checkMixedChannelRiskMock.mockResolvedValue({ has_risk: false })
+    updateAccountMock.mockResolvedValue(account)
+
+    const wrapper = mountModal(account)
+    const toggle = wrapper.get('[data-testid="unify-client-error-message-toggle"]')
+    expect(toggle.attributes('aria-checked')).toBe('true')
+
+    await toggle.trigger('click')
+    await wrapper.get('form#edit-account-form').trigger('submit.prevent')
+
+    expect(updateAccountMock).toHaveBeenCalledTimes(1)
+    expect(updateAccountMock.mock.calls[0]?.[1]?.extra?.unify_client_error_message).toBeUndefined()
+  })
+
   it('loads and submits the per-account OpenAI long-context billing toggle', async () => {
     const account = buildAccount()
     account.extra = {

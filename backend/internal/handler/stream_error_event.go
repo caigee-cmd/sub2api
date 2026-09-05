@@ -57,6 +57,14 @@ type responsesFailedEvent struct {
 // 此时 caller 也无法回退到 JSON（HTTP 200 已固化），通常意味着连接已经损坏，
 // 应当让请求处理函数 return，由上层关闭连接。
 func writeResponsesFailedSSE(c *gin.Context, errType, message string) bool {
+	status := http.StatusBadGateway
+	if c != nil {
+		status = c.Writer.Status()
+		if status < 400 {
+			status = http.StatusBadGateway
+		}
+	}
+	message = maybeUnifyClientErrorMessage(c, status, message)
 	flusher, ok := c.Writer.(http.Flusher)
 	if !ok {
 		return false
