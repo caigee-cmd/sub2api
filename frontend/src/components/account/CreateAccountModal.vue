@@ -4533,13 +4533,6 @@ function applyUnifyClientErrorMessage(extra: Record<string, unknown>) {
 }
 
 
-function parseIdentitySystemPromptRows(raw: unknown): IdentitySystemPromptRow[] {
-  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return []
-  return Object.entries(raw as Record<string, unknown>)
-    .filter(([, prompt]) => typeof prompt === 'string')
-    .map(([model, prompt]) => ({ model, prompt: prompt as string }))
-}
-
 function buildIdentitySystemPrompts(rows: IdentitySystemPromptRow[]): Record<string, string> | undefined {
   const mapping: Record<string, string> = {}
   for (const row of rows) {
