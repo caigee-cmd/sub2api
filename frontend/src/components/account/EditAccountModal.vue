@@ -2174,7 +2174,8 @@
           </div>
           <button
             type="button"
-            @click="codexCLIOnlyEnabled = !codexCLIOnlyEnabled"
+            data-testid="edit-codex-cli-only-toggle"
+            @click="toggleCodexCLIOnly"
             :class="[
               'relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2',
               codexCLIOnlyEnabled ? 'bg-primary-600' : 'bg-gray-200 dark:bg-dark-600'
@@ -2256,9 +2257,9 @@
         </div>
       </div>
 
-      <!-- Codex 指纹收敛模式（仅 OpenAI OAuth） -->
+      <!-- Codex 指纹收敛模式（OpenAI OAuth / setup-token / API Key） -->
       <div
-        v-if="account?.platform === 'openai' && account?.type === 'oauth'"
+        v-if="account?.platform === 'openai' && (account?.type === 'oauth' || account?.type === 'setup-token' || account?.type === 'apikey')"
         class="border-t border-gray-200 pt-4 dark:border-dark-600"
       >
         <div class="flex items-center justify-between gap-4">
@@ -3523,6 +3524,10 @@ const openaiAPIKeyResponsesWebSocketV2Mode = ref<OpenAIWSMode>(OPENAI_WS_MODE_OF
 	  codexCLIOnlyBlacklistRows.value.splice(i, 1)
 	}
 type CodexFingerprintMode = 'off' | 'device' | 'session' | 'full'
+const defaultCodexFingerprintModeWhenCLIOnly: CodexFingerprintMode = 'session'
+const supportsCodexFingerprint = computed(
+  () => props.account?.platform === 'openai' && (props.account?.type === 'oauth' || props.account?.type === 'setup-token' || props.account?.type === 'apikey')
+)
 const codexFingerprintMode = ref<CodexFingerprintMode>('off')
 type CodexImageToolMode = 'inherit' | 'enabled' | 'disabled' | 'block'
 const codexImageToolMode = ref<CodexImageToolMode>('inherit')
@@ -3561,6 +3566,16 @@ const codexFingerprintModeOptions = computed(() => [
   { value: 'session' as CodexFingerprintMode, label: t('admin.accounts.openai.codexFingerprintSession') },
   { value: 'full' as CodexFingerprintMode, label: t('admin.accounts.openai.codexFingerprintFull') },
 ])
+function maybeEnableCodexFingerprintWithCLIOnly() {
+  if (!supportsCodexFingerprint.value) return
+  if (codexFingerprintMode.value !== 'off') return
+  codexFingerprintMode.value = defaultCodexFingerprintModeWhenCLIOnly
+}
+function toggleCodexCLIOnly() {
+  const next = !codexCLIOnlyEnabled.value
+  codexCLIOnlyEnabled.value = next
+  if (next) maybeEnableCodexFingerprintWithCLIOnly()
+}
 
 const openAIWSModeOptions = computed(() => [
   { value: OPENAI_WS_MODE_OFF, label: t('admin.accounts.openai.wsModeOff') },
@@ -4061,7 +4076,7 @@ const syncFormFromAccount = (newAccount: Account | null) => {
     } else {
       codexCLIOnlyBlacklistRows.value = []
     }
-    if (newAccount.type === 'oauth') {
+    if (newAccount.platform === 'openai' && (newAccount.type === 'oauth' || newAccount.type === 'setup-token' || newAccount.type === 'apikey')) {
       const fpMode = extra?.codex_fingerprint_mode as string | undefined
       // 缺省/非法值按 off 呈现，与后端 GetCodexFingerprintMode 的 opt-in 语义一致（#5610）
       codexFingerprintMode.value = (['off', 'device', 'session', 'full'].includes(fpMode || '')
@@ -5542,7 +5557,7 @@ const handleSubmit = async () => {
 
       // 指纹收敛模式：默认 off（不写入）；device/session/full 是显式 opt-in，
       // 必须落键，否则管理员的选择会被后端当作"未设置"而回落到 off（#5610）。
-      if (props.account.type === 'oauth') {
+      if (props.account.platform === 'openai' && (props.account.type === 'oauth' || props.account.type === 'setup-token' || props.account.type === 'apikey')) {
         if (codexFingerprintMode.value !== 'off') {
           newExtra.codex_fingerprint_mode = codexFingerprintMode.value
         } else {

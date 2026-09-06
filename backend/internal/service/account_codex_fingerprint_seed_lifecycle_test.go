@@ -37,6 +37,27 @@ func TestAdminCreateAccountStripsUserSeedAndCreatesFreshSeedWhenEnabled(t *testi
 	require.Equal(t, "session", created.Extra[codexFingerprintModeExtraKey])
 }
 
+func TestAdminCreateAccountCreatesFingerprintSeedForOpenAIAPIKey(t *testing.T) {
+	repo := &upstreamBillingProbeAccountRepo{}
+	svc := &adminServiceImpl{accountRepo: repo}
+
+	created, err := svc.CreateAccount(context.Background(), &CreateAccountInput{
+		Name:                 "codex-apikey",
+		Platform:             PlatformOpenAI,
+		Type:                 AccountTypeAPIKey,
+		SkipDefaultGroupBind: true,
+		Extra: map[string]any{
+			codexFingerprintModeExtraKey: "session",
+			codexFingerprintSeedExtraKey: userSuppliedCodexFingerprintSeed,
+		},
+	})
+
+	require.NoError(t, err)
+	seed := requireValidCodexFingerprintSeed(t, created.Extra)
+	require.NotEqual(t, userSuppliedCodexFingerprintSeed, seed)
+	require.Equal(t, "session", created.Extra[codexFingerprintModeExtraKey])
+}
+
 func TestAdminUpdateAccountPreservesExistingSeedAndStripsUserSeed(t *testing.T) {
 	accountID := int64(201)
 	repo := &upstreamBillingProbeAccountRepo{accounts: map[int64]*Account{
@@ -189,11 +210,11 @@ func TestDuplicateAccountDoesNotCopyCodexFingerprintSeed(t *testing.T) {
 
 	duplicate, err := svc.DuplicateAccount(ctx, source.ID, "admin:1", "")
 
-	require.NoError(t, err)
-	require.NotEqual(t, source.ID, duplicate.ID)
-	require.NotContains(t, duplicate.Extra, codexFingerprintSeedExtraKey)
-	require.Equal(t, "session", duplicate.Extra[codexFingerprintModeExtraKey])
-}
+		require.NoError(t, err)
+		require.NotEqual(t, source.ID, duplicate.ID)
+		require.NotEqual(t, testCodexFingerprintSeed, requireValidCodexFingerprintSeed(t, duplicate.Extra))
+		require.Equal(t, "session", duplicate.Extra[codexFingerprintModeExtraKey])
+	}
 
 func TestDuplicateCreatePathMintsFreshSeedWhenEligible(t *testing.T) {
 	extra, err := duplicateAccountExtra(map[string]any{

@@ -32,7 +32,7 @@ func stageCodexFingerprintIDs(c *gin.Context, ids *codexFingerprintIDs) {
 }
 
 func stagedCodexFingerprintIDs(c *gin.Context, account *Account) *codexFingerprintIDs {
-	if c == nil || account == nil || !account.UsesOpenAICodexProtocol() {
+	if c == nil || account == nil || !account.SupportsCodexFingerprintConvergence() {
 		return nil
 	}
 	value, ok := c.Get(codexFingerprintIDsContextKey)
@@ -48,7 +48,7 @@ func stagedCodexFingerprintIDs(c *gin.Context, account *Account) *codexFingerpri
 
 // applyStagedCodexFingerprintHeaders 读取 context 暂存的收敛 ID 并改写出站头。
 // 非透传与透传两个请求构造器共用本函数，防止应用语义漂移。仅解析该
-// snapshot 的 OAuth 账号可读取，避免 stale context 跨账号 failover 泄漏。
+// snapshot 的账号可读取，避免 stale context 跨账号 failover 泄漏。
 func applyStagedCodexFingerprintHeaders(c *gin.Context, account *Account, h http.Header) {
 	applyCodexFingerprintHeaders(h, stagedCodexFingerprintIDs(c, account))
 }
@@ -57,8 +57,8 @@ func applyStagedCodexFingerprintClientMetadata(c *gin.Context, account *Account,
 	return applyCodexFingerprintClientMetadata(reqBody, stagedCodexFingerprintIDs(c, account))
 }
 
-// codexFingerprintMode 控制 OAuth 账号出站请求的设备指纹收敛强度。
-// 多人共享同一 OAuth 账号时，每个用户的 Codex 客户端会携带各自不同的
+// codexFingerprintMode 控制 OpenAI Codex 出站请求的设备指纹收敛强度。
+// 多人共享同一账号时，每个用户的 Codex 客户端会携带各自不同的
 // installation_id / session_id / thread_id，上游据此判定设备数和会话数。
 // 收敛模式将这些标识改写为账号级恒定值，减少上游可见的设备/会话指纹。
 type codexFingerprintMode string
@@ -141,7 +141,7 @@ func codexFingerprintSeed(extra map[string]any) (string, bool) {
 
 func prepareCodexFingerprintExtraForCreate(platform, accountType string, extra map[string]any) map[string]any {
 	prepared := stripCodexFingerprintSeed(extra)
-	if platform != PlatformOpenAI || (accountType != AccountTypeOAuth && accountType != AccountTypeSetupToken) || !codexFingerprintModeRequiresSeed(codexFingerprintModeFromExtra(prepared)) {
+	if platform != PlatformOpenAI || (accountType != AccountTypeOAuth && accountType != AccountTypeSetupToken && accountType != AccountTypeAPIKey) || !codexFingerprintModeRequiresSeed(codexFingerprintModeFromExtra(prepared)) {
 		return prepared
 	}
 	if prepared == nil {
@@ -153,7 +153,7 @@ func prepareCodexFingerprintExtraForCreate(platform, accountType string, extra m
 
 func prepareCodexFingerprintExtraForUpdate(account *Account, extra map[string]any) map[string]any {
 	prepared := stripCodexFingerprintSeed(extra)
-	if account == nil || !account.IsOpenAIOAuthLike() {
+	if account == nil || !account.SupportsCodexFingerprintConvergence() {
 		return prepared
 	}
 	if seed, ok := codexFingerprintSeed(account.Extra); ok {
@@ -203,7 +203,7 @@ func ShouldEnsureCodexFingerprintSeedForExtraUpdates(updates map[string]any) boo
 // 的 A/B 实测。上游的配额判定策略不可观测，因此这里取兼容安全的一侧：
 // 不显式 opt-in 就保持 v0.1.175 之前的客户端身份（#5610）。
 func (a *Account) GetCodexFingerprintMode() codexFingerprintMode {
-	if a == nil || !a.IsOpenAIOAuthLike() {
+	if a == nil || !a.SupportsCodexFingerprintConvergence() {
 		return codexFingerprintOff
 	}
 	return codexFingerprintModeFromExtra(a.Extra)

@@ -586,4 +586,35 @@ describe('CreateAccountModal OpenAI long-context billing', () => {
 
     expect(createOpenAICodexPATMock.mock.calls[0]?.[0]?.extra?.openai_long_context_billing_enabled).toBe(false)
   })
+
+  it('turns on session fingerprint when Codex CLI-only is enabled for OpenAI OAuth', async () => {
+    const wrapper = mountModal()
+    await selectButtonByText(wrapper, 'OpenAI')
+    await wrapper.get('[data-testid="create-codex-cli-only-toggle"]').trigger('click')
+
+    expect((wrapper.vm as any).codexFingerprintMode).toBe('session')
+    expect((wrapper.vm as any).buildOpenAIExtra()?.codex_cli_only).toBe(true)
+    expect((wrapper.vm as any).buildOpenAIExtra()?.codex_fingerprint_mode).toBe('session')
+  })
+
+  it('turns on session fingerprint when Codex CLI-only is enabled for OpenAI API Key', async () => {
+    const wrapper = mountModal()
+    await selectButtonByText(wrapper, 'OpenAI')
+    await selectButtonByText(wrapper, 'API Key')
+    await wrapper.get('[data-testid="create-codex-cli-only-toggle"]').trigger('click')
+
+    expect((wrapper.vm as any).codexFingerprintMode).toBe('session')
+    expect((wrapper.vm as any).buildOpenAIExtra()?.codex_cli_only).toBe(true)
+    expect((wrapper.vm as any).buildOpenAIExtra()?.codex_fingerprint_mode).toBe('session')
+  })
+
+  it('keeps an already chosen fingerprint mode when CLI-only is enabled', async () => {
+    const wrapper = mountModal()
+    await selectButtonByText(wrapper, 'OpenAI')
+    ;(wrapper.vm as any).codexFingerprintMode = 'full'
+    await wrapper.get('[data-testid="create-codex-cli-only-toggle"]').trigger('click')
+
+    expect((wrapper.vm as any).codexFingerprintMode).toBe('full')
+    expect((wrapper.vm as any).buildOpenAIExtra()?.codex_fingerprint_mode).toBe('full')
+  })
 })

@@ -13,12 +13,12 @@ import (
 	"strings"
 	"time"
 
-		"github.com/Wei-Shaw/sub2api/internal/config"
-		"github.com/Wei-Shaw/sub2api/internal/domain"
-		"github.com/Wei-Shaw/sub2api/internal/pkg/geminicli"
-		"github.com/Wei-Shaw/sub2api/internal/pkg/openai"
-		"github.com/Wei-Shaw/sub2api/internal/pkg/openai_compat"
-		"github.com/Wei-Shaw/sub2api/internal/pkg/xai"
+	"github.com/Wei-Shaw/sub2api/internal/config"
+	"github.com/Wei-Shaw/sub2api/internal/domain"
+	"github.com/Wei-Shaw/sub2api/internal/pkg/geminicli"
+	"github.com/Wei-Shaw/sub2api/internal/pkg/openai"
+	"github.com/Wei-Shaw/sub2api/internal/pkg/openai_compat"
+	"github.com/Wei-Shaw/sub2api/internal/pkg/xai"
 )
 
 type Account struct {
@@ -89,11 +89,11 @@ type OpenAIEndpointCapability string
 
 const openAILongContextBillingEnabledKey = "openai_long_context_billing_enabled"
 
-	// UnifyClientErrorMessageKey is an optional per-account override stored in
-	// accounts.extra. When true, gateway responses keep the original HTTP status
-	// and error type/code, but replace the client-visible message with a generic
-	// status-based sentence. Default (absent/false) preserves current behavior.
-	const UnifyClientErrorMessageKey = "unify_client_error_message"
+// UnifyClientErrorMessageKey is an optional per-account override stored in
+// accounts.extra. When true, gateway responses keep the original HTTP status
+// and error type/code, but replace the client-visible message with a generic
+// status-based sentence. Default (absent/false) preserves current behavior.
+const UnifyClientErrorMessageKey = "unify_client_error_message"
 
 const (
 	OpenAIEndpointCapabilityChatCompletions OpenAIEndpointCapability = "chat_completions"
@@ -1376,6 +1376,14 @@ func (a *Account) IsOpenAIOAuthLike() bool {
 // accounts whose platform is implicit, while adding OpenAI SetupToken.
 func (a *Account) UsesOpenAICodexProtocol() bool {
 	return a != nil && (a.Type == AccountTypeOAuth || a.IsOpenAIOAuthLike())
+}
+
+// SupportsCodexFingerprintConvergence reports whether Codex device/session
+// fingerprint rewriting can apply to this account. OAuth and setup-token use
+// the ChatGPT Codex protocol; OpenAI API-key accounts still receive Codex CLI
+// identity headers on /v1/responses when clients are restricted to Codex.
+func (a *Account) SupportsCodexFingerprintConvergence() bool {
+	return a.IsOpenAIOAuthLike() || a.IsOpenAIApiKey()
 }
 
 func (a *Account) IsOpenAIChatGPTSubscription() bool {

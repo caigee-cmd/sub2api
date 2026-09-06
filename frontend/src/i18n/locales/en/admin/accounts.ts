@@ -643,7 +643,7 @@ export default {
         planTypeClear: 'Clear (auto-detect)',
         codexCLIOnly: 'Codex official clients only',
         codexCLIOnlyDesc:
-          'Applies to all OpenAI-platform accounts (including API keys). When enabled, only Codex official client families are allowed, and the global version/fingerprint/blacklist gates also apply; when disabled, the gateway bypasses this restriction and keeps existing behavior.',
+          'Applies to all OpenAI-platform accounts (including API keys). When enabled, only Codex official client families are allowed, and the global version/fingerprint/blacklist gates also apply; when disabled, the gateway bypasses this restriction and keeps existing behavior. For OpenAI accounts that still have fingerprint convergence off, enabling this also switches it to Device + Session; an already chosen mode is left unchanged.',
         codexCLIOnlyBlacklist: 'Account-level blacklist',
         codexCLIOnlyBlacklistDesc:
           'Effective only when the switch above is on. Deny if any field matches; takes precedence over official-client identity. originator is exact; User-Agent is a contains match; model supports * and ? wildcards. All fields are optional but each entry needs at least one.',
@@ -656,7 +656,7 @@ export default {
         codexCLIOnlyAppServerDesc:
           "Effective only when the switch above is on. When enabled, this account also allows third-party clients that embed the Codex engine over the app-server protocol (e.g. Claude Code's codex plugin); they still pass the global engine-fingerprint gate. OR-combined with the global app-server toggle.",
         codexFingerprintMode: 'Codex fingerprint convergence',
-        codexFingerprintModeDesc: 'When multiple users share the same OAuth account, converge device/session identifiers to account-level stable values to reduce upstream-visible device and session count. Off by default (client identifiers pass through as-is); opt in explicitly when needed. Some accounts reported quota shrinkage after enabling convergence, so choose based on your own measurements.',
+        codexFingerprintModeDesc: 'When multiple users share the same OpenAI account, converge device/session identifiers to account-level stable values to reduce upstream-visible device and session count. Applies to OAuth, setup-token, and API Key accounts. Off by default (client identifiers pass through as-is); opt in explicitly when needed. Some accounts reported quota shrinkage after enabling convergence, so choose based on your own measurements.',
         codexFingerprintOff: 'Off (passthrough, default)',
         codexFingerprintDevice: 'Device only',
         codexFingerprintSession: 'Device + Session',

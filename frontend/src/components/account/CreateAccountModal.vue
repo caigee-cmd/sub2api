@@ -3245,7 +3245,8 @@
           </div>
           <button
             type="button"
-            @click="codexCLIOnlyEnabled = !codexCLIOnlyEnabled"
+            data-testid="create-codex-cli-only-toggle"
+            @click="toggleCodexCLIOnly"
             :class="[
               'relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2',
               codexCLIOnlyEnabled ? 'bg-primary-600' : 'bg-gray-200 dark:bg-dark-600'
@@ -3327,9 +3328,9 @@
         </div>
       </div>
 
-      <!-- Codex 指纹收敛模式（仅 OpenAI OAuth） -->
+      <!-- Codex 指纹收敛模式（OpenAI OAuth / setup-token / API Key） -->
       <div
-        v-if="form.platform === 'openai' && accountCategory === 'oauth-based'"
+        v-if="form.platform === 'openai' && (accountCategory === 'oauth-based' || accountCategory === 'apikey')"
         class="border-t border-gray-200 pt-4 dark:border-dark-600"
       >
         <div class="flex items-center justify-between gap-4">
@@ -4438,6 +4439,10 @@ function removeCodexCLIOnlyBlacklistRow(i: number): void {
   codexCLIOnlyBlacklistRows.value.splice(i, 1)
 }
 type CodexFingerprintMode = 'off' | 'device' | 'session' | 'full'
+const defaultCodexFingerprintModeWhenCLIOnly: CodexFingerprintMode = 'session'
+const supportsCodexFingerprint = computed(
+  () => form.platform === 'openai' && (accountCategory.value === 'oauth-based' || accountCategory.value === 'apikey')
+)
 const codexFingerprintMode = ref<CodexFingerprintMode>('off')
 const codexFingerprintModeOptions = computed(() => [
   { value: 'off' as CodexFingerprintMode, label: t('admin.accounts.openai.codexFingerprintOff') },
@@ -4445,6 +4450,16 @@ const codexFingerprintModeOptions = computed(() => [
   { value: 'session' as CodexFingerprintMode, label: t('admin.accounts.openai.codexFingerprintSession') },
   { value: 'full' as CodexFingerprintMode, label: t('admin.accounts.openai.codexFingerprintFull') },
 ])
+function maybeEnableCodexFingerprintWithCLIOnly() {
+  if (!supportsCodexFingerprint.value) return
+  if (codexFingerprintMode.value !== 'off') return
+  codexFingerprintMode.value = defaultCodexFingerprintModeWhenCLIOnly
+}
+function toggleCodexCLIOnly() {
+  const next = !codexCLIOnlyEnabled.value
+  codexCLIOnlyEnabled.value = next
+  if (next) maybeEnableCodexFingerprintWithCLIOnly()
+}
 type AnthropicAPIKeyAuthScheme = 'x_api_key' | 'authorization_bearer'
 const anthropicPassthroughEnabled = ref(false)
 const anthropicAPIKeyAuthScheme = ref<AnthropicAPIKeyAuthScheme>('x_api_key')
