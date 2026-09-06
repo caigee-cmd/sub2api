@@ -917,7 +917,7 @@
               'relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2',
               codexCLIOnlyEnabled ? 'bg-primary-600' : 'bg-gray-200 dark:bg-dark-600'
             ]"
-            @click="codexCLIOnlyEnabled = !codexCLIOnlyEnabled"
+            @click="toggleBulkCodexCLIOnly"
           >
             <span
               :class="[
@@ -973,8 +973,8 @@
         </div>
       </div>
 
-      <!-- Codex 指纹收敛模式（仅 OpenAI OAuth） -->
-      <div v-if="allOpenAIOAuth" class="border-t border-gray-200 pt-4 dark:border-dark-600">
+      <!-- Codex 指纹收敛模式（OpenAI OAuth / setup-token / API Key） -->
+      <div v-if="allOpenAI" class="border-t border-gray-200 pt-4 dark:border-dark-600">
         <div class="mb-3 flex items-center justify-between">
           <label class="input-label mb-0">{{ t('admin.accounts.openai.codexFingerprintMode') }}</label>
           <input
@@ -1716,6 +1716,7 @@ const upstreamBillingAutoProbeMode = ref<'enabled' | 'disabled'>('enabled')
 const codexCLIOnlyEnabled = ref(false)
 const codexCLIOnlyAppServerEnabled = ref(false)
 type CodexFingerprintMode = 'off' | 'device' | 'session' | 'full'
+const defaultCodexFingerprintModeWhenCLIOnly: CodexFingerprintMode = 'session'
 const enableCodexFingerprintMode = ref(false)
 const codexFingerprintMode = ref<CodexFingerprintMode>('off')
 const codexFingerprintModeOptions = computed(() => [
@@ -1724,6 +1725,18 @@ const codexFingerprintModeOptions = computed(() => [
   { value: 'session' as CodexFingerprintMode, label: t('admin.accounts.openai.codexFingerprintSession') },
   { value: 'full' as CodexFingerprintMode, label: t('admin.accounts.openai.codexFingerprintFull') },
 ])
+function toggleBulkCodexCLIOnly() {
+  const next = !codexCLIOnlyEnabled.value
+  codexCLIOnlyEnabled.value = next
+  if (
+    next &&
+    allOpenAI.value &&
+    !enableCodexFingerprintMode.value &&
+    codexFingerprintMode.value === 'off'
+  ) {
+    codexFingerprintMode.value = defaultCodexFingerprintModeWhenCLIOnly
+  }
+}
 const openAICompactMode = ref<OpenAICompactMode>('auto')
 const openAICompactModelMappings = ref<ModelMapping[]>([])
 const rpmLimitEnabled = ref(false)
@@ -2084,6 +2097,15 @@ const buildUpdatePayload = (): Record<string, unknown> | null => {
   if (enableCodexCLIOnly.value) {
     const extra = ensureExtra()
     extra.codex_cli_only = codexCLIOnlyEnabled.value
+    // OpenAI 账号打开「仅允许 Codex 客户端」时，若本次没有单独改指纹收敛，
+    // 自动带上 session。已显式编辑指纹字段时尊重管理员选择（含 off）。
+    if (
+      extra.codex_cli_only === true &&
+      allOpenAI.value &&
+      !enableCodexFingerprintMode.value
+    ) {
+      extra.codex_fingerprint_mode = defaultCodexFingerprintModeWhenCLIOnly
+    }
   }
 
   // 子开关从属于 codex_cli_only：仅当同一次批量编辑也把父开关设为开启时才写入，

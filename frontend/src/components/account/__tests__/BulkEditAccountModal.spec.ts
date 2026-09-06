@@ -363,7 +363,8 @@ describe('BulkEditAccountModal', () => {
     expect(adminAPI.accounts.bulkUpdate).toHaveBeenCalledTimes(1)
     expect(adminAPI.accounts.bulkUpdate).toHaveBeenCalledWith([1, 2], {
       extra: {
-        codex_cli_only: true
+        codex_cli_only: true,
+        codex_fingerprint_mode: 'session'
       }
     })
   })
@@ -386,6 +387,7 @@ describe('BulkEditAccountModal', () => {
     expect(adminAPI.accounts.bulkUpdate).toHaveBeenCalledWith([1, 2], {
       extra: {
         codex_cli_only: true,
+        codex_fingerprint_mode: 'session',
         codex_cli_only_allow_app_server: true
       }
     })
@@ -973,8 +975,7 @@ describe('BulkEditAccountModal', () => {
     })
   })
 
-  // 未勾选「编辑该项」时不得写入该键，否则批量编辑别的字段会顺手清掉账号的收敛设置。
-  it('未勾选编辑该项时不写入 codex_fingerprint_mode', async () => {
+  it('批量开启 CLI-only 且未单独编辑指纹时自动写入 session', async () => {
     const wrapper = mountModal({
       selectedPlatforms: ['openai'],
       selectedTypes: ['oauth']
@@ -987,7 +988,50 @@ describe('BulkEditAccountModal', () => {
 
     expect(adminAPI.accounts.bulkUpdate).toHaveBeenCalledWith([1, 2], {
       extra: {
-        codex_cli_only: true
+        codex_cli_only: true,
+        codex_fingerprint_mode: 'session'
+      }
+    })
+  })
+
+  it('批量开启 CLI-only 时若显式编辑指纹则尊重管理员选择', async () => {
+    const wrapper = mountModal({
+      selectedPlatforms: ['openai'],
+      selectedTypes: ['oauth']
+    })
+
+    await wrapper.get('#bulk-edit-openai-codex-cli-only-enabled').setValue(true)
+    await wrapper.get('#bulk-edit-openai-codex-cli-only-toggle').trigger('click')
+    await wrapper.get('#bulk-edit-openai-codex-fingerprint-mode-enabled').setValue(true)
+    await wrapper
+      .get('[data-testid="bulk-codex-fingerprint-mode-select"]')
+      .setValue('off')
+    await wrapper.get('#bulk-edit-account-form').trigger('submit.prevent')
+    await flushPromises()
+
+    expect(adminAPI.accounts.bulkUpdate).toHaveBeenCalledWith([1, 2], {
+      extra: {
+        codex_cli_only: true,
+        codex_fingerprint_mode: 'off'
+      }
+    })
+  })
+
+  it('OpenAI API Key 批量开启 CLI-only 时自动写入 session 指纹收敛', async () => {
+    const wrapper = mountModal({
+      selectedPlatforms: ['openai'],
+      selectedTypes: ['apikey']
+    })
+
+    await wrapper.get('#bulk-edit-openai-codex-cli-only-enabled').setValue(true)
+    await wrapper.get('#bulk-edit-openai-codex-cli-only-toggle').trigger('click')
+    await wrapper.get('#bulk-edit-account-form').trigger('submit.prevent')
+    await flushPromises()
+
+    expect(adminAPI.accounts.bulkUpdate).toHaveBeenCalledWith([1, 2], {
+      extra: {
+        codex_cli_only: true,
+        codex_fingerprint_mode: 'session'
       }
     })
   })
