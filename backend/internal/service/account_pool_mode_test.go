@@ -5,6 +5,7 @@ package service
 import (
 	"encoding/json"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 )
@@ -112,6 +113,128 @@ func TestGetPoolModeRetryCount(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			require.Equal(t, tt.expected, tt.account.GetPoolModeRetryCount())
+		})
+	}
+}
+
+func TestGetPoolModeRetryInterval(t *testing.T) {
+	defaultInterval := time.Duration(defaultPoolModeRetryIntervalMS) * time.Millisecond
+	maxInterval := time.Duration(maxPoolModeRetryIntervalMS) * time.Millisecond
+
+	tests := []struct {
+		name     string
+		account  *Account
+		expected time.Duration
+	}{
+		{
+			name: "default_when_not_pool_mode",
+			account: &Account{
+				Type:        AccountTypeAPIKey,
+				Platform:    PlatformOpenAI,
+				Credentials: map[string]any{},
+			},
+			expected: defaultInterval,
+		},
+		{
+			name: "default_when_missing_retry_interval",
+			account: &Account{
+				Type:     AccountTypeAPIKey,
+				Platform: PlatformOpenAI,
+				Credentials: map[string]any{
+					"pool_mode": true,
+				},
+			},
+			expected: defaultInterval,
+		},
+		{
+			name: "supports_float64_from_json_credentials",
+			account: &Account{
+				Type:     AccountTypeAPIKey,
+				Platform: PlatformOpenAI,
+				Credentials: map[string]any{
+					"pool_mode":                true,
+					"pool_mode_retry_interval": float64(1500),
+				},
+			},
+			expected: 1500 * time.Millisecond,
+		},
+		{
+			name: "supports_json_number",
+			account: &Account{
+				Type:     AccountTypeAPIKey,
+				Platform: PlatformOpenAI,
+				Credentials: map[string]any{
+					"pool_mode":                true,
+					"pool_mode_retry_interval": json.Number("2000"),
+				},
+			},
+			expected: 2 * time.Second,
+		},
+		{
+			name: "supports_string_value",
+			account: &Account{
+				Type:     AccountTypeAPIKey,
+				Platform: PlatformOpenAI,
+				Credentials: map[string]any{
+					"pool_mode":                true,
+					"pool_mode_retry_interval": "250",
+				},
+			},
+			expected: 250 * time.Millisecond,
+		},
+		{
+			name: "zero_means_no_wait",
+			account: &Account{
+				Type:     AccountTypeAPIKey,
+				Platform: PlatformOpenAI,
+				Credentials: map[string]any{
+					"pool_mode":                true,
+					"pool_mode_retry_interval": 0,
+				},
+			},
+			expected: 0,
+		},
+		{
+			name: "negative_value_is_clamped_to_zero",
+			account: &Account{
+				Type:     AccountTypeAPIKey,
+				Platform: PlatformOpenAI,
+				Credentials: map[string]any{
+					"pool_mode":                true,
+					"pool_mode_retry_interval": -1,
+				},
+			},
+			expected: 0,
+		},
+		{
+			name: "oversized_value_is_clamped_to_max",
+			account: &Account{
+				Type:     AccountTypeAPIKey,
+				Platform: PlatformOpenAI,
+				Credentials: map[string]any{
+					"pool_mode":                true,
+					"pool_mode_retry_interval": 99_000,
+				},
+			},
+			expected: maxInterval,
+		},
+		{
+			name: "invalid_value_falls_back_to_default",
+			account: &Account{
+				Type:     AccountTypeAPIKey,
+				Platform: PlatformOpenAI,
+				Credentials: map[string]any{
+					"pool_mode":                true,
+					"pool_mode_retry_interval": "oops",
+				},
+			},
+			expected: defaultInterval,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			require.Equal(t, tt.expected, tt.account.GetPoolModeRetryInterval())
 		})
 	}
 }

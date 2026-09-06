@@ -1129,8 +1129,10 @@ func (a *Account) IsPoolMode() bool {
 }
 
 const (
-	defaultPoolModeRetryCount = 3
-	maxPoolModeRetryCount     = 10
+	defaultPoolModeRetryCount      = 3
+	maxPoolModeRetryCount          = 10
+	defaultPoolModeRetryIntervalMS = 500
+	maxPoolModeRetryIntervalMS     = 30000
 )
 
 // GetPoolModeRetryCount 返回池模式同账号重试次数。
@@ -1154,6 +1156,35 @@ func (a *Account) GetPoolModeRetryCount() int {
 }
 
 func parsePoolModeRetryCount(value any) int {
+	return parsePoolModeInt(value, defaultPoolModeRetryCount)
+}
+
+// GetPoolModeRetryInterval 返回池模式同账号重试间隔。
+// 凭证字段 pool_mode_retry_interval 单位为毫秒。未配置或非法时回退为 500ms；
+// 小于 0 按 0 处理（不等待）；过大则截断到 30s。
+func (a *Account) GetPoolModeRetryInterval() time.Duration {
+	if a == nil || !a.IsPoolMode() || a.Credentials == nil {
+		return time.Duration(defaultPoolModeRetryIntervalMS) * time.Millisecond
+	}
+	raw, ok := a.Credentials["pool_mode_retry_interval"]
+	if !ok || raw == nil {
+		return time.Duration(defaultPoolModeRetryIntervalMS) * time.Millisecond
+	}
+	ms := parsePoolModeRetryIntervalMS(raw)
+	if ms < 0 {
+		return 0
+	}
+	if ms > maxPoolModeRetryIntervalMS {
+		ms = maxPoolModeRetryIntervalMS
+	}
+	return time.Duration(ms) * time.Millisecond
+}
+
+func parsePoolModeRetryIntervalMS(value any) int {
+	return parsePoolModeInt(value, defaultPoolModeRetryIntervalMS)
+}
+
+func parsePoolModeInt(value any, fallback int) int {
 	switch v := value.(type) {
 	case int:
 		return v
@@ -1170,7 +1201,7 @@ func parsePoolModeRetryCount(value any) int {
 			return i
 		}
 	}
-	return defaultPoolModeRetryCount
+	return fallback
 }
 
 // defaultPoolModeRetryableStatusCodes 池模式下默认触发同账号重试的状态码。

@@ -63,6 +63,23 @@ func TestSameAccountRetryDelayFor(t *testing.T) {
 		err := &service.UpstreamFailoverError{SameAccountRetryDelay: 3 * time.Second}
 		require.Equal(t, 3*time.Second, sameAccountRetryDelayFor(err, 1))
 	})
+
+	t.Run("account configured interval replaces default", func(t *testing.T) {
+		require.Equal(t, 2*time.Second, sameAccountRetryDelayFor(&service.UpstreamFailoverError{}, 10, 2*time.Second))
+	})
+
+	t.Run("zero account interval skips wait", func(t *testing.T) {
+		require.Equal(t, time.Duration(0), sameAccountRetryDelayFor(&service.UpstreamFailoverError{}, 1, 0))
+	})
+
+	t.Run("request scoped backoff uses configured base", func(t *testing.T) {
+		require.Equal(t, 2*time.Second, sameAccountRetryDelayFor(capacityErr, 2, time.Second))
+	})
+
+	t.Run("explicit error delay still wins over account interval", func(t *testing.T) {
+		err := &service.UpstreamFailoverError{SameAccountRetryDelay: 3 * time.Second}
+		require.Equal(t, 3*time.Second, sameAccountRetryDelayFor(err, 1, 200*time.Millisecond))
+	})
 }
 
 func TestSameAccountRetryAllowedUsesDeadlineInsteadOfPoolCount(t *testing.T) {

@@ -1604,6 +1604,25 @@
             </p>
           </div>
           <div v-if="poolModeEnabled" class="mt-3">
+            <label class="input-label">{{ t('admin.accounts.poolModeRetryInterval') }}</label>
+            <input
+              v-model.number="poolModeRetryInterval"
+              type="number"
+              min="0"
+              :max="MAX_POOL_MODE_RETRY_INTERVAL"
+              step="1"
+              class="input"
+            />
+            <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+              {{
+                t('admin.accounts.poolModeRetryIntervalHint', {
+                  default: DEFAULT_POOL_MODE_RETRY_INTERVAL,
+                  max: MAX_POOL_MODE_RETRY_INTERVAL
+                })
+              }}
+            </p>
+          </div>
+          <div v-if="poolModeEnabled" class="mt-3">
             <label class="input-label">{{ t('admin.accounts.poolModeRetryStatusCodes') }}</label>
             <input
               v-model="poolModeRetryStatusCodesInput"
@@ -2005,6 +2024,25 @@
                 t('admin.accounts.poolModeRetryCountHint', {
                   default: DEFAULT_POOL_MODE_RETRY_COUNT,
                   max: MAX_POOL_MODE_RETRY_COUNT
+                })
+              }}
+            </p>
+          </div>
+          <div v-if="poolModeEnabled" class="mt-3">
+            <label class="input-label">{{ t('admin.accounts.poolModeRetryInterval') }}</label>
+            <input
+              v-model.number="poolModeRetryInterval"
+              type="number"
+              min="0"
+              :max="MAX_POOL_MODE_RETRY_INTERVAL"
+              step="1"
+              class="input"
+            />
+            <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+              {{
+                t('admin.accounts.poolModeRetryIntervalHint', {
+                  default: DEFAULT_POOL_MODE_RETRY_INTERVAL,
+                  max: MAX_POOL_MODE_RETRY_INTERVAL
                 })
               }}
             </p>
@@ -4328,9 +4366,12 @@ const allowedModels = ref<string[]>([])
 const upstreamModelsPreviewed = ref(false)
 const DEFAULT_POOL_MODE_RETRY_COUNT = 3
 const MAX_POOL_MODE_RETRY_COUNT = 10
+const DEFAULT_POOL_MODE_RETRY_INTERVAL = 500
+const MAX_POOL_MODE_RETRY_INTERVAL = 30000
 const DEFAULT_POOL_MODE_RETRY_STATUS_CODES = [401, 403, 429]
 const poolModeEnabled = ref(false)
 const poolModeRetryCount = ref(DEFAULT_POOL_MODE_RETRY_COUNT)
+const poolModeRetryInterval = ref(DEFAULT_POOL_MODE_RETRY_INTERVAL)
 const poolModeRetryStatusCodesInput = ref('')
 
 function parsePoolModeRetryStatusCodes(input: string): number[] {
@@ -5383,6 +5424,7 @@ const resetForm = () => {
   })
   poolModeEnabled.value = false
   poolModeRetryCount.value = DEFAULT_POOL_MODE_RETRY_COUNT
+  poolModeRetryInterval.value = DEFAULT_POOL_MODE_RETRY_INTERVAL
   poolModeRetryStatusCodesInput.value = ''
   customErrorCodesEnabled.value = false
   selectedErrorCodes.value = []
@@ -5628,6 +5670,20 @@ const normalizePoolModeRetryCount = (value: number) => {
   return normalized
 }
 
+const normalizePoolModeRetryInterval = (value: number) => {
+  if (!Number.isFinite(value)) {
+    return DEFAULT_POOL_MODE_RETRY_INTERVAL
+  }
+  const normalized = Math.trunc(value)
+  if (normalized < 0) {
+    return 0
+  }
+  if (normalized > MAX_POOL_MODE_RETRY_INTERVAL) {
+    return MAX_POOL_MODE_RETRY_INTERVAL
+  }
+  return normalized
+}
+
 const applyVertexServiceAccountJson = (value: string) => {
   const raw = value.trim()
   if (!raw) {
@@ -5741,6 +5797,7 @@ const handleSubmit = async () => {
     if (poolModeEnabled.value) {
       credentials.pool_mode = true
       credentials.pool_mode_retry_count = normalizePoolModeRetryCount(poolModeRetryCount.value)
+      credentials.pool_mode_retry_interval = normalizePoolModeRetryInterval(poolModeRetryInterval.value)
       const parsedRetryStatusCodes = parsePoolModeRetryStatusCodes(poolModeRetryStatusCodesInput.value)
       if (parsedRetryStatusCodes.length > 0) {
         credentials.pool_mode_retry_status_codes = parsedRetryStatusCodes
@@ -5886,6 +5943,7 @@ const handleSubmit = async () => {
   if (poolModeEnabled.value) {
     credentials.pool_mode = true
     credentials.pool_mode_retry_count = normalizePoolModeRetryCount(poolModeRetryCount.value)
+    credentials.pool_mode_retry_interval = normalizePoolModeRetryInterval(poolModeRetryInterval.value)
     const parsedRetryStatusCodes = parsePoolModeRetryStatusCodes(poolModeRetryStatusCodesInput.value)
     if (parsedRetryStatusCodes.length > 0) {
       credentials.pool_mode_retry_status_codes = parsedRetryStatusCodes
