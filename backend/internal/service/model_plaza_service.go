@@ -223,32 +223,21 @@ func (s *ModelPlazaService) ListGroups(ctx context.Context) ([]PlazaGroup, error
 	return out, nil
 }
 
-// filterPlazaModelsByAllowlist keeps only models present in the group's
-// models_list_config when that allowlist is enabled. Unconfigured groups keep
-// the full channel-aggregated catalog.
-func filterPlazaModelsByAllowlist(models []PlazaModel, g *Group) []PlazaModel {
-	if g == nil || !g.CustomModelsListEnabled() {
-		return models
-	}
-	allowed := make(map[string]struct{}, len(g.ModelsListConfig.Models))
-	for _, name := range g.ModelsListConfig.Models {
-		name = strings.TrimSpace(name)
-		if name == "" {
-			continue
+	// filterPlazaModelsByAllowlist keeps only models present in the group's
+	// model_allowlist when that allowlist is enabled. Unconfigured groups keep
+	// the full channel-aggregated catalog.
+	func filterPlazaModelsByAllowlist(models []PlazaModel, g *Group) []PlazaModel {
+		if g == nil || !g.ModelAllowlistEnabled() {
+			return models
 		}
-		allowed[strings.ToLower(name)] = struct{}{}
-	}
-	if len(allowed) == 0 {
-		return models
-	}
-	filtered := make([]PlazaModel, 0, len(models))
-	for _, model := range models {
-		if _, ok := allowed[strings.ToLower(model.Name)]; ok {
-			filtered = append(filtered, model)
+		filtered := make([]PlazaModel, 0, len(models))
+		for _, model := range models {
+			if g.ModelAllowlist.Allows(model.Name) {
+				filtered = append(filtered, model)
+			}
 		}
+		return filtered
 	}
-	return filtered
-}
 
 // fillDisplayPricing 把模型的展示定价换成实收口径：
 // token 模型取计费阶梯表（单价与档位均由真实计费函数得出），
@@ -299,6 +288,7 @@ func plazaPricingFromSchedule(raw *ChannelModelPricing, sched *ContextPricingSch
 	out.InputPrice = first.Input
 	out.OutputPrice = first.Output
 	out.CacheWritePrice = first.CacheWrite
+	out.CacheWrite1hPrice = first.CacheWrite1h
 	out.CacheReadPrice = first.CacheRead
 	if len(sched.Tiers) > 1 {
 		out.Intervals = plazaIntervalsFromTiers(sched.Tiers)
@@ -310,14 +300,15 @@ func plazaIntervalsFromTiers(tiers []ContextPricingTier) []PricingInterval {
 	intervals := make([]PricingInterval, 0, len(tiers))
 	for i, t := range tiers {
 		intervals = append(intervals, PricingInterval{
-			MinTokens:       t.MinTokens,
-			MaxTokens:       t.MaxTokens,
-			TierLabel:       t.Label,
-			InputPrice:      t.Input,
-			OutputPrice:     t.Output,
-			CacheWritePrice: t.CacheWrite,
-			CacheReadPrice:  t.CacheRead,
-			SortOrder:       i,
+			MinTokens:         t.MinTokens,
+			MaxTokens:         t.MaxTokens,
+			TierLabel:         t.Label,
+			InputPrice:        t.Input,
+			OutputPrice:       t.Output,
+			CacheWritePrice:   t.CacheWrite,
+			CacheWrite1hPrice: t.CacheWrite1h,
+			CacheReadPrice:    t.CacheRead,
+			SortOrder:         i,
 		})
 	}
 	return intervals
