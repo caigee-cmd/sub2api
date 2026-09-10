@@ -104,10 +104,10 @@ type Group struct {
 	WeeklyLimitUSD            *float64 `json:"weekly_limit_usd"`
 	MonthlyLimitUSD           *float64 `json:"monthly_limit_usd"`
 	LongContextPricingEnabled bool     `json:"long_context_pricing_enabled"`
-	// ModelsListConfig is the operator-managed allowlist of models this group
+	// ModelAllowlist is the operator-managed allowlist of models this group
 	// can route. Exposed to authenticated users so clients can filter model
 	// catalogs (e.g. model plaza) without inventing business rules.
-	ModelsListConfig domain.GroupModelsListConfig `json:"models_list_config"`
+	ModelAllowlist service.GroupModelAllowlist `json:"model_allowlist"`
 
 	// 图片生成计费配置（仅 antigravity 平台使用）
 	AllowImageGeneration         bool    `json:"allow_image_generation"`
