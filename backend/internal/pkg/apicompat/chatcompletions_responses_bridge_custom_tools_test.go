@@ -639,7 +639,7 @@ func TestResponsesToChatCompletionsRequest_PromotesCompletedToolSearchDiscoverie
 			{ID: "call_1", Type: "function", Function: ChatFunctionCall{Name: "collaboration__spawn_agent", Arguments: `{}`}},
 			{ID: "call_2", Type: "function", Function: ChatFunctionCall{Name: "exec", Arguments: `{"input":"pwd"}`}},
 		}},
-	}}}, req.Model, CustomToolNames(effective), FunctionToolNames(effective), HasToolSearchTool(effective), namespaces)
+	}}}, req.Model, CustomToolNames(effective), FunctionToolNames(effective), HasToolSearchTool(effective), namespaces, false)
 	require.Len(t, responses.Output, 2)
 	assert.Equal(t, "function_call", responses.Output[0].Type)
 	assert.Equal(t, "spawn_agent", responses.Output[0].Name)
