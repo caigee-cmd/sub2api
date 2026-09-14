@@ -345,12 +345,12 @@ func TestListPlazaGroups_RepoErrorsPropagate(t *testing.T) {
 }
 
 func TestListPlazaGroups_ModelsListConfigAllowlist(t *testing.T) {
-	// 启用 models_list_config 的分组只保留白名单内模型；未启用的分组保持渠道聚合全集。
+	// 启用 model_allowlist 的分组只保留白名单内模型；未启用的分组保持渠道聚合全集。
 	ch := plazaPricedChannel(1, "ch", []int64{10, 20}, "openai", "gpt-5.6-sol", "gpt-5.5", "glm-5.3")
 	groups := []Group{
 		{
 			ID: 10, Name: "codex", Platform: "openai", RateMultiplier: 0.19,
-			ModelsListConfig: GroupModelsListConfig{Enabled: true, Models: []string{"gpt-5.6-sol", "gpt-5.5"}},
+			ModelAllowlist: GroupModelAllowlist{Enabled: true, Models: []string{"gpt-5.6-sol", "gpt-5.5"}},
 		},
 		{ID: 20, Name: "open", Platform: "openai", RateMultiplier: 1},
 	}
@@ -366,6 +366,7 @@ func TestListPlazaGroups_ModelsListConfigAllowlist(t *testing.T) {
 	require.Equal(t, "gpt-5.6-sol", byName["codex"][1].Name)
 	require.Len(t, byName["open"], 3)
 }
+
 // newPlazaServiceWithBilling 构造接入计费服务与解析器的广场服务：解析器的渠道服务与广场共用同一份渠道数据。
 func newPlazaServiceWithBilling(channels []Channel, groups []Group, groupPlatforms map[int64]string, catalog *PricingService) *ModelPlazaService {
 	repo := &mockChannelRepository{
@@ -374,7 +375,7 @@ func newPlazaServiceWithBilling(channels []Channel, groups []Group, groupPlatfor
 			return groupPlatforms, nil
 		},
 	}
-	cs := NewChannelService(repo, nil, nil, nil)
+	cs := NewChannelService(repo, nil, nil, nil, nil)
 	bs := NewBillingService(&config.Config{}, catalog)
 	return NewModelPlazaService(repo, &stubGroupRepoForAvailable{activeGroups: groups}, catalog, bs, NewModelPricingResolver(cs, bs))
 }
