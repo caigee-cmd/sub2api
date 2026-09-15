@@ -104,10 +104,6 @@ type Group struct {
 	WeeklyLimitUSD            *float64 `json:"weekly_limit_usd"`
 	MonthlyLimitUSD           *float64 `json:"monthly_limit_usd"`
 	LongContextPricingEnabled bool     `json:"long_context_pricing_enabled"`
-	// ModelsListConfig is the operator-managed allowlist of models this group
-	// can route. Exposed to authenticated users so clients can filter model
-	// catalogs (e.g. model plaza) without inventing business rules.
-	ModelsListConfig domain.GroupModelsListConfig `json:"models_list_config"`
 
 	// 图片生成计费配置（仅 antigravity 平台使用）
 	AllowImageGeneration         bool    `json:"allow_image_generation"`
@@ -193,6 +189,7 @@ type AdminGroup struct {
 	// OpenAI Messages 调度配置（仅 openai 平台使用）
 	DefaultMappedModel          string                                   `json:"default_mapped_model"`
 	MessagesDispatchModelConfig domain.OpenAIMessagesDispatchModelConfig `json:"messages_dispatch_model_config"`
+	ModelAllowlist              service.GroupModelAllowlist              `json:"model_allowlist"`
 	// 固定账号获取 Codex Model Manifest 配置（仅 openai 平台使用）。
 	CodexModelsManifestConfig domain.GroupCodexModelsManifestConfig `json:"codex_models_manifest_config"`
 
