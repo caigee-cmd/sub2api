@@ -87,27 +87,30 @@ func (s *OpenAIGatewayService) forwardResponsesViaRawChatCompletions(
 		}
 		return nil, err
 	}
-		if thinkingBody, injected := EnsureQwenEnableThinking(chatBody, upstreamModel); injected {
-			chatBody = thinkingBody
-		}
-		if strippedBody, stripped := StripQwenReasoningEffort(chatBody, upstreamModel, account.GetOpenAIBaseURL()); stripped {
-			chatBody = strippedBody
-		}
-		if strippedBody, stripped := StripKimiReasoning(chatBody, upstreamModel, originalModel); stripped {
-			chatBody = strippedBody
-		}
-		if imgBody, imgStripped := StripImageInputAsText(chatBody, originalModel, account); imgStripped {
-			chatBody = imgBody
-		}
-		if identityBody, injected := InjectIdentitySystemPrompt(chatBody, originalModel, account); injected {
-			chatBody = identityBody
-		}
-		// 计费兜底 tier = 最终出站 body（policy filter/force 后）里的 tier；最终值由
-		// resolvedOpenAIUpstreamServiceTier 决定（上游回显优先）。filter 删掉字段后
-		// 这里取到 nil，不再按原请求 Fast 计费。
-		// Keep the final outbound tier for usage-time reconciliation. A policy
-		// filter that removes the field therefore leaves this nil.
-		serviceTier := extractOpenAIServiceTierFromBody(chatBody)
+	if thinkingBody, injected := EnsureQwenEnableThinking(chatBody, upstreamModel); injected {
+		chatBody = thinkingBody
+	}
+	if strippedBody, stripped := StripQwenReasoningEffort(chatBody, upstreamModel, account.GetOpenAIBaseURL()); stripped {
+		chatBody = strippedBody
+	}
+	if strippedBody, stripped := StripKimiReasoning(chatBody, upstreamModel, originalModel); stripped {
+		chatBody = strippedBody
+	}
+	if imgBody, imgStripped := StripImageInputAsText(chatBody, originalModel, account); imgStripped {
+		chatBody = imgBody
+	}
+	if identityBody, injected := InjectIdentitySystemPrompt(chatBody, originalModel, account); injected {
+		chatBody = identityBody
+	}
+	// /v1/responses 降级到 raw CC 的出站与 forwardAsRawChatCompletions 共用同一个
+	// 独立 Ollama Cloud token 钩子；chatReq.Model 已是模型映射后的 upstreamModel。
+	chatBody = clampOllamaCloudUpstreamMaxTokens(account, chatBody)
+	// 计费兜底 tier = 最终出站 body（policy filter/force 后）里的 tier；最终值由
+	// resolvedOpenAIUpstreamServiceTier 决定（上游回显优先）。filter 删掉字段后
+	// 这里取到 nil，不再按原请求 Fast 计费。
+	// Keep the final outbound tier for usage-time reconciliation. A policy
+	// filter that removes the field therefore leaves this nil.
+	serviceTier := extractOpenAIServiceTierFromBody(chatBody)
 
 	logger.L().Debug("openai responses: forwarding via raw chat completions",
 		zap.Int64("account_id", account.ID),
