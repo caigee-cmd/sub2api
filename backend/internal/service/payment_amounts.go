@@ -8,7 +8,8 @@ import (
 )
 
 const defaultBalanceRechargeMultiplier = 1.0
-const maxRechargeBonusPercent = 1000.0
+
+// maxRechargeBonusPercent 已在 payment_recharge_bonus.go 声明（上游阶梯优惠），此处不重复定义。
 
 func normalizeBalanceRechargeMultiplier(multiplier float64) float64 {
 	if math.IsNaN(multiplier) || math.IsInf(multiplier, 0) || multiplier <= 0 {

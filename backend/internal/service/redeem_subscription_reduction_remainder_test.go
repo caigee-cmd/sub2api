@@ -25,7 +25,7 @@ func TestRedeemReductionPreservesRemainingTime(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			sub := UserSubscription{ID: 7, ExpiresAt: now.Add(tc.remaining), Status: SubscriptionStatusActive, Notes: "original"}
 			repo := &lockingRenewalRepo{stale: sub, current: sub}
-			subscriptions := NewSubscriptionService(nil, repo, nil, nil, nil)
+			subscriptions := NewSubscriptionService(nil, repo, nil, nil, nil, nil)
 			subscriptions.now = func() time.Time { return now }
 			svc := &RedeemService{subscriptionService: subscriptions}
 			require.NoError(t, svc.reduceOrCancelSubscription(context.Background(), 11, 13, tc.days, "deduct"))

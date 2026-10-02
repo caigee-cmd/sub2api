@@ -15,7 +15,7 @@ func TestRedeemReductionUsesLockedSubscription(t *testing.T) {
 	current.ExpiresAt = now.AddDate(0, 0, 20)
 	current.Notes = "renewed"
 	repo := &lockingRenewalRepo{stale: stale, current: current}
-	svc := &RedeemService{subscriptionService: NewSubscriptionService(nil, repo, nil, nil, nil)}
+	svc := &RedeemService{subscriptionService: NewSubscriptionService(nil, repo, nil, nil, nil, nil)}
 	require.NoError(t, svc.reduceOrCancelSubscription(context.Background(), 11, 13, 1, "minus-one-day"))
 	require.Equal(t, current.ExpiresAt.AddDate(0, 0, -1), repo.current.ExpiresAt)
 	require.Contains(t, repo.current.Notes, "renewed")
@@ -33,7 +33,7 @@ func (r *failingReductionLockRepo) GetByIDForUpdate(context.Context, int64) (*Us
 func TestRedeemReductionLockFailureDoesNotWrite(t *testing.T) {
 	sub := UserSubscription{ID: 7, ExpiresAt: time.Now().AddDate(0, 0, 10), Status: SubscriptionStatusActive, Notes: "unchanged"}
 	repo := &failingReductionLockRepo{lockingRenewalRepo: &lockingRenewalRepo{stale: sub, current: sub}, err: errors.New("lock failed")}
-	svc := &RedeemService{subscriptionService: NewSubscriptionService(nil, repo, nil, nil, nil)}
+	svc := &RedeemService{subscriptionService: NewSubscriptionService(nil, repo, nil, nil, nil, nil)}
 	require.ErrorIs(t, svc.reduceOrCancelSubscription(context.Background(), 11, 13, 1, "deduct"), repo.err)
 	require.Equal(t, sub, repo.current)
 }
