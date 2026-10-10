@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log"
 	"math/rand/v2"
@@ -1466,10 +1467,12 @@ func (s *SubscriptionService) ResolveUpgradeFromSubscription(ctx context.Context
 	return s.PreviewUpgrade(ctx, userID, fromSubscriptionID, newPlanID)
 }
 
-// FulfillUpgradeSubscription 在支付履约时执行升级：原子地软删旧订阅 + 创建新订阅。
+// FulfillUpgradeSubscription 在支付履约时执行升级：原子地软删旧订阅，再给目标套餐建订阅。
+// 目标套餐已有未删除订阅时不能再建一条（user_subscriptions_user_group_unique_active），
+// 改为在原到期时间上延长本单的有效期，不重置用量窗口。
 // 由 PaymentService.ensurePaymentSubscriptionAssigned 在事务内调用。
 // 调用方必须已经持有 dbent.TxContext（withSubscriptionUpdateTx 会复用该事务）。
-// 返回新建的订阅（含 ID）和旧订阅的 groupID（供调用方失效缓存）。
+// 返回目标订阅（含 ID）和旧订阅的 groupID（供调用方失效缓存）。
 func (s *SubscriptionService) FulfillUpgradeSubscription(ctx context.Context, userID, fromSubscriptionID int64, newPlan *dbent.SubscriptionPlan, notes string) (*UserSubscription, int64, error) {
 	if newPlan == nil {
 		return nil, 0, ErrSubscriptionNilInput
@@ -1501,14 +1504,38 @@ func (s *SubscriptionService) FulfillUpgradeSubscription(ctx context.Context, us
 		validityDays = MaxValidityDays
 	}
 
-	// 3. 在事务内：软删旧订阅 + 创建新订阅（带 plan_id）
+	// 3. 在事务内：先锁住目标套餐已有订阅，再软删旧订阅。
+	// 目标套餐没有订阅才新建；已有则延长到期时间。锁必须在删除之前，
+	// 否则目标行不存在时，并发履约会同时走到新建并撞上唯一索引。
 	newPlanID := int64(newPlan.ID)
 	var newSub *UserSubscription
 	err = s.withSubscriptionUpdateTx(ctx, func(txCtx context.Context) error {
+		existing, lookupErr := s.userSubRepo.GetByUserIDAndGroupID(txCtx, userID, newPlan.GroupID)
+		if lookupErr != nil && !errors.Is(lookupErr, ErrSubscriptionNotFound) {
+			return fmt.Errorf("check target subscription: %w", lookupErr)
+		}
+		var lockedExisting *UserSubscription
+		if existing != nil {
+			locked, lockErr := s.userSubRepo.GetByIDForUpdate(txCtx, existing.ID)
+			if lockErr != nil {
+				return fmt.Errorf("lock target subscription: %w", lockErr)
+			}
+			lockedExisting = locked
+		}
+
 		// 软删旧订阅（Delete 是软删除，配合 016 部分唯一索引允许同 group 重建）
 		if err := s.userSubRepo.Delete(txCtx, oldSub.ID); err != nil {
 			return fmt.Errorf("soft-delete old subscription: %w", err)
 		}
+		if lockedExisting != nil {
+			extended, extendErr := s.extendUpgradeSubscription(txCtx, lockedExisting, validityDays, &newPlanID, notes)
+			if extendErr != nil {
+				return fmt.Errorf("extend upgraded subscription: %w", extendErr)
+			}
+			newSub = extended
+			return nil
+		}
+
 		// 创建新订阅（新 group，带 plan_id 透传）
 		created, createErr := s.createSubscription(txCtx, &AssignSubscriptionInput{
 			UserID:       userID,
@@ -1528,4 +1555,42 @@ func (s *SubscriptionService) FulfillUpgradeSubscription(ctx context.Context, us
 		return nil, 0, err
 	}
 	return newSub, oldGroupID, nil
+}
+
+// extendUpgradeSubscription 把已付的升级有效期加到目标套餐现有订阅上。
+// 未过期从原到期时间累加；已过期从现在起算并重新激活。不重置用量窗口，
+// 避免升级履约把用户当前周期已经用掉的额度清零。
+func (s *SubscriptionService) extendUpgradeSubscription(ctx context.Context, existing *UserSubscription, validityDays int, planID *int64, notes string) (*UserSubscription, error) {
+	now := time.Now()
+	if s.now != nil {
+		now = s.now()
+	}
+	expired := !existing.ExpiresAt.After(now)
+	newExpiresAt := existing.ExpiresAt.AddDate(0, 0, validityDays)
+	if expired {
+		newExpiresAt = now.AddDate(0, 0, validityDays)
+	}
+	if newExpiresAt.After(MaxExpiresAt) {
+		newExpiresAt = MaxExpiresAt
+	}
+
+	updated := *existing
+	updated.ExpiresAt = newExpiresAt
+	updated.PlanID = planID
+	updated.Notes = appendSubscriptionNotes(existing.Notes, notes)
+	if expired || existing.Status != SubscriptionStatusActive {
+		updated.Status = SubscriptionStatusActive
+		updated.StartsAt = now
+		dailyStart := timezone.StartOfDay(now)
+		updated.DailyWindowStart = &dailyStart
+		updated.WeeklyWindowStart = &now
+		updated.MonthlyWindowStart = &now
+		updated.DailyUsageUSD = 0
+		updated.WeeklyUsageUSD = 0
+		updated.MonthlyUsageUSD = 0
+	}
+	if err := s.userSubRepo.Update(ctx, &updated); err != nil {
+		return nil, err
+	}
+	return &updated, nil
 }

@@ -278,6 +278,53 @@ func (s *subscriptionUserSubRepoStub) Update(_ context.Context, sub *UserSubscri
 	return nil
 }
 
+func (s *subscriptionUserSubRepoStub) ExtendExpiry(_ context.Context, id int64, expiresAt time.Time) error {
+	existing := s.byID[id]
+	if existing == nil {
+		return ErrSubscriptionNotFound
+	}
+	existing.ExpiresAt = expiresAt
+	return nil
+}
+
+func (s *subscriptionUserSubRepoStub) UpdateStatus(_ context.Context, id int64, status string) error {
+	existing := s.byID[id]
+	if existing == nil {
+		return ErrSubscriptionNotFound
+	}
+	existing.Status = status
+	return nil
+}
+
+func (s *subscriptionUserSubRepoStub) UpdateNotes(_ context.Context, id int64, notes string) error {
+	existing := s.byID[id]
+	if existing == nil {
+		return ErrSubscriptionNotFound
+	}
+	existing.Notes = notes
+	return nil
+}
+
+func (s *subscriptionUserSubRepoStub) ResetUsageWindows(_ context.Context, id int64, resetDaily, resetWeekly, resetMonthly bool, dailyStart, periodicStart time.Time) error {
+	existing := s.byID[id]
+	if existing == nil {
+		return ErrSubscriptionNotFound
+	}
+	if resetDaily {
+		existing.DailyUsageUSD = 0
+		existing.DailyWindowStart = &dailyStart
+	}
+	if resetWeekly {
+		existing.WeeklyUsageUSD = 0
+		existing.WeeklyWindowStart = &periodicStart
+	}
+	if resetMonthly {
+		existing.MonthlyUsageUSD = 0
+		existing.MonthlyWindowStart = &periodicStart
+	}
+	return nil
+}
+
 // Delete 软删除订阅（从 byID / byUserGroup 移除，模拟软删后查询不可见）
 func (s *subscriptionUserSubRepoStub) Delete(_ context.Context, id int64) error {
 	existing := s.byID[id]

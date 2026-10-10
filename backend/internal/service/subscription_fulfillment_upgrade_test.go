@@ -70,6 +70,65 @@ func TestFulfillUpgradeSubscription_SoftDeleteOldAndCreateNew(t *testing.T) {
 	require.WithinDuration(t, expectedExpiresStart, newSub.ExpiresAt, time.Minute)
 }
 
+// TestFulfillUpgradeSubscription_ExtendsExistingTargetSubscription 目标套餐已有未删除订阅时，
+// 不能再建一条（唯一索引），应延长原到期时间并保留当前用量。
+func TestFulfillUpgradeSubscription_ExtendsExistingTargetSubscription(t *testing.T) {
+	ctx := context.Background()
+	userID := int64(1001)
+	oldGroupID := int64(7)
+	newGroupID := int64(8)
+
+	subRepo := newSubscriptionUserSubRepoStub()
+	oldSubID := int64(50)
+	oldPlanID := int64(100)
+	subRepo.seed(&UserSubscription{
+		ID:        oldSubID,
+		UserID:    userID,
+		GroupID:   oldGroupID,
+		PlanID:    &oldPlanID,
+		ExpiresAt: time.Now().AddDate(0, 0, 15),
+		Status:    SubscriptionStatusActive,
+	})
+	targetExpiresAt := time.Now().AddDate(0, 0, 12)
+	targetPlanID := int64(180)
+	subRepo.seed(&UserSubscription{
+		ID:              80,
+		UserID:          userID,
+		GroupID:         newGroupID,
+		PlanID:          &targetPlanID,
+		ExpiresAt:       targetExpiresAt,
+		Status:          SubscriptionStatusActive,
+		Notes:           "payment order 246",
+		DailyUsageUSD:   4.5,
+		WeeklyUsageUSD:  4.5,
+		MonthlyUsageUSD: 4.5,
+	})
+
+	svc := NewSubscriptionService(&subscriptionGroupRepoStub{}, subRepo, nil, nil, nil, nil)
+	newPlan := &dbent.SubscriptionPlan{
+		ID:           200,
+		GroupID:      newGroupID,
+		Price:        60,
+		ValidityDays: 30,
+		ValidityUnit: "day",
+	}
+
+	got, returnedOldGroupID, err := svc.FulfillUpgradeSubscription(ctx, userID, oldSubID, newPlan, "payment order 607")
+	require.NoError(t, err)
+	require.Equal(t, int64(80), got.ID)
+	require.Equal(t, oldGroupID, returnedOldGroupID)
+	require.Equal(t, 0, subRepo.createCalls, "existing target subscription must be extended, not recreated")
+	require.WithinDuration(t, targetExpiresAt.AddDate(0, 0, 30), got.ExpiresAt, time.Second)
+	require.Equal(t, int64(200), *got.PlanID)
+	require.Equal(t, "payment order 246\npayment order 607", got.Notes)
+	require.Equal(t, 4.5, got.DailyUsageUSD)
+	require.Equal(t, 4.5, got.WeeklyUsageUSD)
+	require.Equal(t, 4.5, got.MonthlyUsageUSD)
+
+	_, err = subRepo.GetByID(ctx, oldSubID)
+	require.ErrorIs(t, err, ErrSubscriptionNotFound)
+}
+
 // TestFulfillUpgradeSubscription_RejectsSameGroup 升级目标 group 与当前相同应拒绝
 func TestFulfillUpgradeSubscription_RejectsSameGroup(t *testing.T) {
 	ctx := context.Background()
