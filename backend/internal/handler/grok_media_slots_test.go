@@ -123,6 +123,7 @@ type grokMediaSlotBindings struct {
 	owner   int64
 	writes  int
 	key     string
+	owners  map[string]int64
 	billed  map[string]bool
 	pending map[string][]byte
 }
@@ -139,13 +140,25 @@ func (s *grokMediaSlotBindings) GetGrokVideoPendingBilling(_ context.Context, ke
 }
 
 func (s *grokMediaSlotBindings) GetSessionAccountID(_ context.Context, groupID int64, key string) (int64, error) {
-	if groupID != 24 || key != s.key {
+	if groupID != 24 {
+		return 0, service.ErrStickySessionNotFound
+	}
+	if s.owners != nil {
+		if owner, ok := s.owners[key]; ok {
+			return owner, nil
+		}
+	}
+	if key != s.key {
 		return 0, service.ErrStickySessionNotFound
 	}
 	return s.owner, nil
 }
 func (s *grokMediaSlotBindings) SetSessionAccountID(_ context.Context, _ int64, key string, owner int64, _ time.Duration) error {
 	s.key, s.owner = key, owner
+	if s.owners == nil {
+		s.owners = make(map[string]int64)
+	}
+	s.owners[key] = owner
 	s.writes++
 	return nil
 }
@@ -209,7 +222,7 @@ func newGrokMediaSlotHandler(t *testing.T, oauth, mismatch bool, platforms ...st
 		if len(platforms) > 0 {
 			accounts[i].Platform = platforms[0]
 			accounts[i].Credentials["base_url"] = "https://ark.cn-beijing.volces.com/api/v3"
-			accounts[i].Credentials["openai_capabilities"] = []string{"seedance"}
+			accounts[i].Credentials["openai_capabilities"] = []string{"seedance", "videos"}
 		}
 		if oauth {
 			accounts[i].Type = service.AccountTypeOAuth

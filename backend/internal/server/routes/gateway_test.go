@@ -311,23 +311,17 @@ func TestGatewayRoutesNonGrokVideosAreRejectedAtPlatformGate(t *testing.T) {
 		body   string
 	}{
 		{http.MethodPost, "/v1/videos/generations", `{"model":"grok-imagine-video-1.5","prompt":"waves"}`},
-		{http.MethodPost, "/v1/videos", `{"model":"grok-imagine-video-1.5","prompt":"waves"}`},
-		{http.MethodPost, "/videos", `{"model":"grok-imagine-video-1.5","prompt":"waves"}`},
 		{http.MethodPost, "/videos/generations", `{"model":"grok-imagine-video-1.5","prompt":"waves"}`},
 		{http.MethodPost, "/v1/videos/edits", `{"model":"grok-imagine-video","prompt":"waves","video":{"url":"https://example.com/in.mp4"}}`},
 		{http.MethodPost, "/videos/edits", `{"model":"grok-imagine-video","prompt":"waves","video":{"url":"https://example.com/in.mp4"}}`},
 		{http.MethodPost, "/v1/videos/extensions", `{"model":"grok-imagine-video","prompt":"waves","video":{"url":"https://example.com/in.mp4"}}`},
 		{http.MethodPost, "/videos/extensions", `{"model":"grok-imagine-video","prompt":"waves","video":{"url":"https://example.com/in.mp4"}}`},
-		{http.MethodGet, "/v1/videos/request-123", ""},
-		{http.MethodGet, "/videos/request-123", ""},
 		{http.MethodGet, "/v1/videos/generations/request-123", ""},
 		{http.MethodGet, "/videos/generations/request-123", ""},
 		{http.MethodGet, "/v1/videos/edits/request-123", ""},
 		{http.MethodGet, "/videos/edits/request-123", ""},
 		{http.MethodGet, "/v1/videos/extensions/request-123", ""},
 		{http.MethodGet, "/videos/extensions/request-123", ""},
-		{http.MethodGet, "/v1/videos/request-123/content", ""},
-		{http.MethodGet, "/videos/request-123/content", ""},
 		{http.MethodGet, "/v1/videos/generations/request-123/content", ""},
 		{http.MethodGet, "/videos/generations/request-123/content", ""},
 		{http.MethodGet, "/v1/videos/edits/request-123/content", ""},
@@ -465,4 +459,26 @@ func TestGatewayRoutesOpenAICountTokensPathIsRegistered(t *testing.T) {
 
 	router.ServeHTTP(w, req)
 	require.NotEqual(t, http.StatusNotFound, w.Code)
+}
+
+func TestGatewayRoutesOpenAIVideosPassPlatformGate(t *testing.T) {
+	router := newGatewayRoutesTestRouter(service.PlatformOpenAI)
+	for _, tc := range []struct {
+		method string
+		path   string
+	}{
+		{http.MethodPost, "/v1/videos"},
+		{http.MethodPost, "/videos"},
+		{http.MethodGet, "/v1/videos/request-123"},
+		{http.MethodGet, "/videos/request-123"},
+		{http.MethodGet, "/v1/videos/request-123/content"},
+		{http.MethodGet, "/videos/request-123/content"},
+	} {
+		req := httptest.NewRequest(tc.method, tc.path, strings.NewReader(`{"model":"video","prompt":"waves","seconds":"8","size":"1280x720"}`))
+		req.Header.Set("Content-Type", "application/json")
+		w := httptest.NewRecorder()
+		router.ServeHTTP(w, req)
+		require.NotEqual(t, http.StatusNotFound, w.Code, "method=%s path=%s body=%s", tc.method, tc.path, w.Body.String())
+		require.NotContains(t, w.Body.String(), "Videos API is not supported for this platform")
+	}
 }

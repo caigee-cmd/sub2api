@@ -105,6 +105,21 @@ func RegisterGatewayRoutes(
 			},
 		})
 	}
+	// OpenAI 兼容视频协议只认 /videos，不认 Grok 的 /videos/generations。
+	openAIVideoHandler := func(c *gin.Context) {
+		platform := getGroupPlatform(c)
+		if platform == service.PlatformOpenAI || platform == service.PlatformComposite {
+			h.OpenAIGateway.OpenAIVideos(c)
+			return
+		}
+		service.MarkOpsClientBusinessLimited(c, service.OpsClientBusinessLimitedReasonLocalFeatureGate)
+		c.JSON(http.StatusNotFound, gin.H{
+			"error": gin.H{
+				"type":    "not_found_error",
+				"message": "Videos API is not supported for this platform",
+			},
+		})
+	}
 	videoStatusHandler := func(c *gin.Context) {
 		// Video status requests do not carry a model, so composite groups cannot
 		// be resolved by compositeTargetPlatformMiddleware. Route them through
@@ -265,9 +280,8 @@ func RegisterGatewayRoutes(
 		gateway.POST("/images/batches/:id/cancel", h.BatchImage.Cancel)
 		gateway.DELETE("/images/batches/:id", h.BatchImage.DeleteRecord)
 		gateway.DELETE("/images/batches/:id/outputs", h.BatchImage.DeleteOutputs)
-		// OpenAI-compatible clients may create through /videos; xAI receives the
-		// canonical /videos/generations route inside the Grok media forwarder.
-		gateway.POST("/videos", videoGenerationHandler)
+		// OpenAI 兼容视频走 /videos；/videos/generations 仍转给 Grok。
+		gateway.POST("/videos", openAIVideoHandler)
 		gateway.POST("/videos/generations", videoGenerationHandler)
 		gateway.POST("/videos/edits", videoEditHandler)
 		gateway.POST("/videos/extensions", videoExtensionHandler)
@@ -277,8 +291,8 @@ func RegisterGatewayRoutes(
 		gateway.GET("/videos/generations/:request_id", videoStatusHandler)
 		gateway.GET("/videos/edits/:request_id", videoStatusHandler)
 		gateway.GET("/videos/extensions/:request_id", videoStatusHandler)
-		gateway.GET("/videos/:request_id", videoStatusHandler)
-		gateway.GET("/videos/:request_id/content", videoContentHandler)
+		gateway.GET("/videos/:request_id", openAIVideoHandler)
+		gateway.GET("/videos/:request_id/content", openAIVideoHandler)
 
 		// xAI Voice APIs (Grok platform only): HTTP TTS/STT + Realtime WS.
 		// Not part of the creation-center product surface — gateway relay only.
@@ -423,7 +437,7 @@ func RegisterGatewayRoutes(
 	rootRoute(http.MethodPost, "/images/generations/async", bodyLimit, h.AsyncImage.Submit)
 	rootRoute(http.MethodPost, "/images/edits/async", bodyLimit, h.AsyncImage.Submit)
 	rootRoute(http.MethodGet, "/images/tasks/:task_id", bodyLimit, h.AsyncImage.Get)
-	rootRoute(http.MethodPost, "/videos", bodyLimit, videoGenerationHandler)
+	rootRoute(http.MethodPost, "/videos", bodyLimit, openAIVideoHandler)
 	rootRoute(http.MethodPost, "/videos/generations", bodyLimit, videoGenerationHandler)
 	rootRoute(http.MethodPost, "/videos/edits", bodyLimit, videoEditHandler)
 	rootRoute(http.MethodPost, "/videos/extensions", bodyLimit, videoExtensionHandler)
@@ -433,8 +447,8 @@ func RegisterGatewayRoutes(
 	rootRoute(http.MethodGet, "/videos/generations/:request_id", bodyLimit, videoStatusHandler)
 	rootRoute(http.MethodGet, "/videos/edits/:request_id", bodyLimit, videoStatusHandler)
 	rootRoute(http.MethodGet, "/videos/extensions/:request_id", bodyLimit, videoStatusHandler)
-	rootRoute(http.MethodGet, "/videos/:request_id", bodyLimit, videoStatusHandler)
-	rootRoute(http.MethodGet, "/videos/:request_id/content", bodyLimit, videoContentHandler)
+	rootRoute(http.MethodGet, "/videos/:request_id", bodyLimit, openAIVideoHandler)
+	rootRoute(http.MethodGet, "/videos/:request_id/content", bodyLimit, openAIVideoHandler)
 
 	rootVoiceHandler := func(endpoint string) gin.HandlerFunc {
 		return func(c *gin.Context) {
