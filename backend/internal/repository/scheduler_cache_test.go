@@ -22,6 +22,17 @@ func TestFilterSchedulerCredentialsKeepsSubscriptionPlanType(t *testing.T) {
 	require.NotContains(t, filtered, "refresh_token")
 }
 
+func TestFilterSchedulerCredentialsKeepsOpenAIEndpointCapabilities(t *testing.T) {
+	filtered := filterSchedulerCredentials(map[string]any{
+		"api_key":             "secret-key",
+		"openai_capabilities": []any{"chat_completions", "videos"},
+		"access_token":        "secret-access-token",
+	})
+
+	require.Equal(t, []any{"chat_completions", "videos"}, filtered["openai_capabilities"])
+	require.NotContains(t, filtered, "access_token")
+}
+
 func TestFilterSchedulerCredentialsKeepsGeminiExplicitCacheKeys(t *testing.T) {
 	filtered := filterSchedulerCredentials(map[string]any{
 		"api_key":              "k",
