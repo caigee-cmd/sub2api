@@ -4590,6 +4590,7 @@ const openAITextEndpointCapabilityLabel = computed(() => {
 const openAIEndpointCapabilityOptions = computed<{ value: OpenAIEndpointCapability; label: string }[]>(() => [
   { value: 'chat_completions', label: openAITextEndpointCapabilityLabel.value },
   { value: 'embeddings', label: t('admin.accounts.openai.capabilityEmbeddings') },
+  { value: 'messages', label: t('admin.accounts.openai.capabilityMessages') },
   { value: 'seedance', label: 'Seedance (Ark)' },
   { value: 'videos', label: 'Videos' }
 ])
@@ -4598,7 +4599,7 @@ const openAITextGenerationCapabilityEnabled = computed(() =>
 )
 
 const normalizeOpenAIEndpointCapabilities = (values: OpenAIEndpointCapability[]) => {
-  const allowed: OpenAIEndpointCapability[] = ['chat_completions', 'embeddings', 'seedance', 'videos']
+  const allowed: OpenAIEndpointCapability[] = ['chat_completions', 'embeddings', 'messages', 'seedance', 'videos']
   const selected = allowed.filter((value) => values.includes(value))
   return selected.length > 0 ? selected : ['chat_completions', 'embeddings'] as OpenAIEndpointCapability[]
 }
@@ -4608,7 +4609,7 @@ const readOpenAIEndpointCapabilities = (credentials?: Record<string, unknown>): 
   if (Array.isArray(raw)) {
     return normalizeOpenAIEndpointCapabilities(
       raw.filter((value): value is OpenAIEndpointCapability =>
-        value === 'chat_completions' || value === 'embeddings' || value === 'seedance' || value === 'videos'
+        value === 'chat_completions' || value === 'embeddings' || value === 'messages' || value === 'seedance' || value === 'videos'
       )
     )
   }
@@ -4646,7 +4647,7 @@ const toggleOpenAIEndpointCapability = (capability: OpenAIEndpointCapability, ev
 
 const applyOpenAIEndpointCapabilities = (credentials: Record<string, unknown>) => {
   const capabilities = normalizeOpenAIEndpointCapabilities(openAIEndpointCapabilities.value)
-  if (capabilities.length === 2 && !capabilities.includes('seedance') && !capabilities.includes('videos')) {
+  if (capabilities.length === 2 && !capabilities.includes('seedance') && !capabilities.includes('videos') && !capabilities.includes('messages')) {
     delete credentials.openai_capabilities
     return
   }

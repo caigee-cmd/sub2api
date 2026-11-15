@@ -93,6 +93,13 @@ func TestResolveUpstreamProtocol(t *testing.T) {
 		{"openai apikey unknown probe", openAIWithProbe(AccountTypeAPIKey, nil), cc, "", responses},
 		{"openai apikey probe unsupported", openAIWithProbe(AccountTypeAPIKey, false), anthropic, "", cc},
 		{"openai oauth ignores probe", openAIWithProbe(AccountTypeOAuth, false), cc, "", responses},
+		{"openai messages-only forwards anthropic", routingTestAccount(PlatformOpenAI, AccountTypeAPIKey, map[string]any{
+			"openai_capabilities": []any{"messages"},
+			"base_url":            "https://messages.example/v1",
+		}, map[string]any{openai_compat.ExtraKeyResponsesSupported: true}), cc, "claude-sonnet", anthropic},
+		{"openai messages plus chat stays on probe", routingTestAccount(PlatformOpenAI, AccountTypeAPIKey, map[string]any{
+			"openai_capabilities": []any{"messages", "chat_completions"},
+		}, map[string]any{openai_compat.ExtraKeyResponsesSupported: false}), anthropic, "", cc},
 	}
 	for _, tc := range cases {
 		require.Equal(t, tc.want, resolveUpstreamProtocol(tc.account, tc.inbound, tc.model, nil), tc.name)

@@ -102,8 +102,12 @@ const UnifyClientErrorMessageKey = "unify_client_error_message"
 const (
 	OpenAIEndpointCapabilityChatCompletions OpenAIEndpointCapability = "chat_completions"
 	OpenAIEndpointCapabilityEmbeddings      OpenAIEndpointCapability = "embeddings"
-	OpenAIEndpointCapabilityAlphaSearch     OpenAIEndpointCapability = "alpha_search"
-	OpenAIEndpointCapabilityLive            OpenAIEndpointCapability = "live"
+	// OpenAIEndpointCapabilityMessages 表示该 OpenAI API Key 账号的上游只提供
+	// Anthropic /v1/messages。入站 /v1/messages 原样直通，不转成 Chat Completions
+	// 或 Responses。仅声明该能力的账号不承接其他 OpenAI 端点。
+	OpenAIEndpointCapabilityMessages    OpenAIEndpointCapability = "messages"
+	OpenAIEndpointCapabilityAlphaSearch OpenAIEndpointCapability = "alpha_search"
+	OpenAIEndpointCapabilityLive        OpenAIEndpointCapability = "live"
 	// OpenAIEndpointCapabilityGrokMediaGeneration keeps image/video generation
 	// away from Grok accounts that are explicitly disabled or whose billing
 	// entitlement probe was forbidden. Video status lookups intentionally do not
@@ -1744,8 +1748,11 @@ func (a *Account) IsAnthropicProtocol() bool {
 // （上游路径为 {base}/v1/messages）。优先取凭证 base_url，缺失时按
 // 供应商 × 接入模式返回默认端点。非 Anthropic 协议账号返回空串。
 func (a *Account) GetAnthropicProtocolBaseURL() string {
-	if a == nil || (!a.IsAnthropicProtocol() && !a.IsAdaptiveAPIProtocol()) {
+	if a == nil || (!a.IsAnthropicProtocol() && !a.IsAdaptiveAPIProtocol() && !a.OpenAIMessagesOnly()) {
 		return ""
+	}
+	if a.OpenAIMessagesOnly() {
+		return strings.TrimSpace(a.GetCredential("base_url"))
 	}
 	if a.IsAdaptiveAPIProtocol() {
 		return a.GetCNProtocolBaseURL(APIProtocolAnthropic)
@@ -2057,6 +2064,11 @@ func (a *Account) SupportsOpenAIEndpointCapability(capability OpenAIEndpointCapa
 	}
 	switch capability {
 	case OpenAIEndpointCapabilityChatCompletions:
+		if a.OpenAIMessagesOnly() {
+			return false
+		}
+	case OpenAIEndpointCapabilityMessages:
+		return a.OpenAIMessagesOnly()
 	case OpenAIEndpointCapabilityLive:
 		return a.Platform == PlatformOpenAI &&
 			a.Type == AccountTypeOAuth &&
@@ -2097,6 +2109,20 @@ func (a *Account) SupportsOpenAIEndpointCapability(capability OpenAIEndpointCapa
 		return true
 	}
 	return configured[string(capability)]
+}
+
+// OpenAIMessagesOnly 报告 OpenAI API Key 账号是否只声明了 messages 能力。
+// 这类上游没有 Chat Completions / Responses，只能承接 /v1/messages。
+// 同时声明 chat_completions 时保持原协议，避免把普通文本号改成直通。
+func (a *Account) OpenAIMessagesOnly() bool {
+	if a == nil || a.Platform != PlatformOpenAI || a.Type != AccountTypeAPIKey {
+		return false
+	}
+	configured, found := a.openAIEndpointCapabilitySet()
+	if !found || !configured[string(OpenAIEndpointCapabilityMessages)] {
+		return false
+	}
+	return !configured[string(OpenAIEndpointCapabilityChatCompletions)]
 }
 
 // GrokMediaGenerationEligibility reports whether a Grok account may receive
@@ -2222,8 +2248,11 @@ func (a *Account) SupportsOpenAIImageCapability(capability OpenAIImagesCapabilit
 	}
 	switch capability {
 	case OpenAIImagesCapabilityAPIKey:
-		return a.Type == AccountTypeAPIKey
+		return a.Type == AccountTypeAPIKey && !a.OpenAIMessagesOnly()
 	case OpenAIImagesCapabilityBasic, OpenAIImagesCapabilityNative:
+		if a.OpenAIMessagesOnly() {
+			return false
+		}
 		return a.Type == AccountTypeOAuth || a.Type == AccountTypeSetupToken || a.Type == AccountTypeAPIKey
 	default:
 		return true

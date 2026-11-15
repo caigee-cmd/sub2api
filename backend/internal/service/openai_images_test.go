@@ -654,6 +654,38 @@ func TestAccountSupportsOpenAIEndpointCapability(t *testing.T) {
 		require.False(t, account.SupportsOpenAIEndpointCapability(OpenAIEndpointCapabilityChatCompletions))
 	})
 
+	t.Run("只声明 messages 的 OpenAI APIKey 不承接 chat 和 embeddings", func(t *testing.T) {
+		account := &Account{
+			Platform: PlatformOpenAI,
+			Type:     AccountTypeAPIKey,
+			Credentials: map[string]any{
+				"openai_capabilities": []any{"messages"},
+				"base_url":            "https://messages.example/v1",
+			},
+		}
+
+		require.True(t, account.OpenAIMessagesOnly())
+		require.True(t, account.SupportsOpenAIEndpointCapability(OpenAIEndpointCapabilityMessages))
+		require.False(t, account.SupportsOpenAIEndpointCapability(OpenAIEndpointCapabilityChatCompletions))
+		require.False(t, account.SupportsOpenAIEndpointCapability(OpenAIEndpointCapabilityEmbeddings))
+		require.False(t, account.SupportsOpenAIEndpointCapability(OpenAIEndpointCapabilityResponses))
+		require.Equal(t, "https://messages.example/v1", account.GetAnthropicProtocolBaseURL())
+	})
+
+	t.Run("messages 与 chat 同时声明时保持 chat 调度", func(t *testing.T) {
+		account := &Account{
+			Platform: PlatformOpenAI,
+			Type:     AccountTypeAPIKey,
+			Credentials: map[string]any{
+				"openai_capabilities": []any{"messages", "chat_completions"},
+			},
+		}
+
+		require.False(t, account.OpenAIMessagesOnly())
+		require.False(t, account.SupportsOpenAIEndpointCapability(OpenAIEndpointCapabilityMessages))
+		require.True(t, account.SupportsOpenAIEndpointCapability(OpenAIEndpointCapabilityChatCompletions))
+	})
+
 	t.Run("未知能力不应默认放行", func(t *testing.T) {
 		account := &Account{
 			Platform: PlatformOpenAI,

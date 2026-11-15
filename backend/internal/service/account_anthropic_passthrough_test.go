@@ -108,6 +108,20 @@ func TestAccount_GetAnthropicAPIKeyAuthScheme(t *testing.T) {
 			},
 			want: AnthropicAPIKeyAuthSchemeXAPIKey,
 		},
+		{
+			name: "messages-only OpenAI API key honors bearer override",
+			account: &Account{
+				Platform: PlatformOpenAI,
+				Type:     AccountTypeAPIKey,
+				Credentials: map[string]any{
+					"openai_capabilities": []any{"messages"},
+				},
+				Extra: map[string]any{
+					"anthropic_apikey_auth_scheme": AnthropicAPIKeyAuthSchemeAuthorizationBearer,
+				},
+			},
+			want: AnthropicAPIKeyAuthSchemeAuthorizationBearer,
+		},
 	}
 
 	for _, tt := range tests {

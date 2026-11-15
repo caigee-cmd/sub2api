@@ -14,12 +14,31 @@ import (
 
 	"github.com/Wei-Shaw/sub2api/internal/pkg/apicompat"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/claude"
+	"github.com/Wei-Shaw/sub2api/internal/pkg/ctxkey"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/logger"
 	"github.com/Wei-Shaw/sub2api/internal/util/responseheaders"
 	"github.com/gin-gonic/gin"
 	"github.com/tidwall/gjson"
 	"go.uber.org/zap"
 )
+
+// WithOpenAIMessagesDispatch 标记当前请求来自 /v1/messages 或其 count_tokens。
+// 只声明 messages 能力的账号据此放行，其他端点看不到这个标记。
+func WithOpenAIMessagesDispatch(ctx context.Context) context.Context {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	return context.WithValue(ctx, ctxkey.OpenAIMessagesDispatch, true)
+}
+
+// OpenAIMessagesDispatchRequested 报告当前 context 是否来自 /v1/messages 调度。
+func OpenAIMessagesDispatchRequested(ctx context.Context) bool {
+	if ctx == nil {
+		return false
+	}
+	requested, _ := ctx.Value(ctxkey.OpenAIMessagesDispatch).(bool)
+	return requested
+}
 
 // ForwardAsAnthropic accepts an Anthropic Messages request body, converts it
 // to OpenAI Responses API format, forwards to the OpenAI upstream, and converts
@@ -76,6 +95,13 @@ func (s *OpenAIGatewayService) ForwardAsAnthropic(
 	// 上游协议统一由 resolveUpstreamProtocol 判定（按模型分流时带上游模型目录）。Anthropic 分流必须先于
 	// ShouldUseResponsesAPI：Anthropic 协议账号经 probe 落标
 	// openai_responses_supported=false，否则会命中 CC 直转。
+	// 只声明 messages 能力的 OpenAI API Key 同样走原生直通，且不能被同分组的
+	// Chat Completions 请求选中。
+	if account.OpenAIMessagesOnly() && !OpenAIMessagesDispatchRequested(ctx) {
+		MarkOpsClientBusinessLimited(c, OpsClientBusinessLimitedReasonLocalFeatureGate)
+		writeAnthropicError(c, http.StatusBadRequest, "invalid_request_error", "This account only supports /v1/messages")
+		return nil, errors.New("openai messages-only account cannot serve this endpoint")
+	}
 	routingModel := upstreamRoutingModel(account, body, defaultMappedModel)
 	if account.IsOpenCodeGo() && IsOpenCodeUnsupportedModel(routingModel) {
 		return nil, writeOpenCodeUnsupportedModelError(c, true, routingModel)

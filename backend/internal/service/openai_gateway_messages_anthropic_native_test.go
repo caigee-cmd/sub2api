@@ -83,6 +83,42 @@ data: {"type":"message_stop"}
 	}
 }
 
+func TestOpenAIMessagesOnlyForwardsNativeMessages(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	body := []byte(`{"model":"claude-sonnet","max_tokens":32,"stream":false,` +
+		`"messages":[{"role":"user","content":"hi"}]}`)
+	account := &Account{
+		ID:          880,
+		Name:        "openai-messages-only",
+		Platform:    PlatformOpenAI,
+		Type:        AccountTypeAPIKey,
+		Concurrency: 1,
+		Credentials: map[string]any{
+			"api_key":             "sk-test",
+			"base_url":            "https://messages.example/v1",
+			"openai_capabilities": []any{"messages"},
+		},
+		Extra: map[string]any{
+			"anthropic_apikey_auth_scheme": AnthropicAPIKeyAuthSchemeAuthorizationBearer,
+		},
+	}
+	upstream := &httpUpstreamRecorder{resp: nativeAnthropicBufferedResponse()}
+	svc := &OpenAIGatewayService{cfg: rawChatCompletionsTestConfig(), httpUpstream: upstream}
+
+	ctx := WithOpenAIMessagesDispatch(context.Background())
+	result, err := svc.ForwardAsAnthropic(ctx, adaptiveProtocolTestContext("/v1/messages", body), account, body, "", "")
+	require.NoError(t, err)
+	require.NotNil(t, result)
+	require.Equal(t, "https://messages.example/v1/messages", upstream.lastReq.URL.String())
+	require.Equal(t, "Bearer sk-test", upstream.lastReq.Header.Get("Authorization"))
+	require.Empty(t, upstream.lastReq.Header.Get("x-api-key"))
+	require.Equal(t, "claude-sonnet", gjson.GetBytes(upstream.lastBody, "model").String())
+
+	_, err = svc.ForwardAsAnthropic(context.Background(), adaptiveProtocolTestContext("/v1/chat/completions", body), account, body, "", "")
+	require.Error(t, err)
+	require.Len(t, upstream.requests, 1)
+}
+
 func TestNativeAnthropicPassthroughRecordsOutputConfigEffort(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	body := []byte(`{"model":"k3","max_tokens":32,"stream":false,` +

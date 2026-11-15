@@ -269,6 +269,7 @@ func (h *OpenAIGatewayHandler) CountTokens(c *gin.Context) {
 	if preferredMappedModel != "" {
 		currentRoutingModel = preferredMappedModel
 	}
+	c.Request = c.Request.WithContext(service.WithOpenAIMessagesDispatch(c.Request.Context()))
 	account, err := h.gatewayService.SelectAccountForTokenCount(
 		c.Request.Context(),
 		apiKey.GroupID,

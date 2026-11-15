@@ -85,4 +85,8 @@ const (
 	// EstimatedInputTokens 是当前请求的估算输入 token 数。
 	// 由 handler 层根据请求体大小粗估，供调度器按账号 max_context_window 过滤。
 	EstimatedInputTokens Key = "ctx_estimated_input_tokens"
+
+	// OpenAIMessagesDispatch 标识当前请求来自 OpenAI 网关的 /v1/messages
+	// 或 /v1/messages/count_tokens。只声明 messages 能力的账号只能承接这类请求。
+	OpenAIMessagesDispatch Key = "ctx_openai_messages_dispatch"
 )

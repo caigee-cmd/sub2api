@@ -2538,8 +2538,19 @@ func accountSupportsOpenAICapabilities(account *Account, requiredCapability Open
 	if account == nil {
 		return false
 	}
-	return account.SupportsOpenAIEndpointCapability(requiredCapability) &&
+	return account.SupportsOpenAIEndpointCapability(messagesPassthroughCapability(requiredCapability, account)) &&
 		account.SupportsOpenAIImageCapability(requiredImageCapability)
+}
+
+// messagesPassthroughCapability 让只声明 messages 能力的 OpenAI API Key 账号
+// 承接 /v1/messages 及其 count_tokens。这两条入口沿用 chat_completions 作为
+// 调度能力，避免改动其他端点的选号条件；该账号对真正的 Chat Completions、
+// Responses 与生图请求仍返回不支持。
+func messagesPassthroughCapability(required OpenAIEndpointCapability, account *Account) OpenAIEndpointCapability {
+	if required == OpenAIEndpointCapabilityChatCompletions && account.OpenAIMessagesOnly() {
+		return OpenAIEndpointCapabilityMessages
+	}
+	return required
 }
 
 func cloneExcludedAccountIDs(excludedIDs map[int64]struct{}) map[int64]struct{} {

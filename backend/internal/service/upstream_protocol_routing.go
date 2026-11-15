@@ -39,7 +39,7 @@ func resolveUpstreamProtocol(account *Account, inbound, model string, catalog []
 		}
 		return APIProtocolChatCompletions
 	}
-	if account.IsAnthropicProtocol() {
+	if account.IsAnthropicProtocol() || account.OpenAIMessagesOnly() {
 		return APIProtocolAnthropic
 	}
 	if shouldForwardOpenAIResponsesViaRawChatCompletions(account) {
