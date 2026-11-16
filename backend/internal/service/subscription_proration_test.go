@@ -173,6 +173,115 @@ func TestComputeUpgradeProration_RemainingDaysCappedToTotal(t *testing.T) {
 	if result.Payable != 30 {
 		t.Errorf("Payable = %.2f, want 30.00", result.Payable)
 	}
+	if result.UnusedRatio != 1 {
+		t.Errorf("UnusedRatio = %.4f, want 1 (no quota limits)", result.UnusedRatio)
+	}
+}
+
+func TestComputeUpgradeProration_UnusedQuotaReducesCredit(t *testing.T) {
+	// 剩 15/30 天，月额度用了一半：credit = 30 × 15/30 × 0.5 = 7.5，而不是按天的 15。
+	oldPlan := &dbent.SubscriptionPlan{Price: 30, ValidityDays: 30, ValidityUnit: "day"}
+	newPlan := &dbent.SubscriptionPlan{Price: 60, ValidityDays: 30, ValidityUnit: "day"}
+	now := time.Now()
+	limit := 100.0
+	window := now.AddDate(0, 0, -10)
+	sub := newSubWithRemainingDays(15)
+	sub.Group = &Group{MonthlyLimitUSD: &limit}
+	sub.MonthlyWindowStart = &window
+	sub.MonthlyUsageUSD = 50
+
+	result, err := ComputeUpgradeProration(oldPlan, newPlan, sub, now)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result.UnusedRatio != 0.5 {
+		t.Errorf("UnusedRatio = %.4f, want 0.5", result.UnusedRatio)
+	}
+	wantCredit := float64(result.RemainingDays) * 0.5
+	if result.Credit != wantCredit {
+		t.Errorf("Credit = %.2f, want %.2f", result.Credit, wantCredit)
+	}
+	if result.Payable != 60-wantCredit {
+		t.Errorf("Payable = %.2f, want %.2f", result.Payable, 60-wantCredit)
+	}
+}
+
+func TestComputeUpgradeProration_IgnoresDailyAndWeeklyQuota(t *testing.T) {
+	// 周额度只剩 20%，月额度还剩 80%：只按月额度抵扣，周额度不参与。
+	oldPlan := &dbent.SubscriptionPlan{Price: 30, ValidityDays: 30, ValidityUnit: "day"}
+	newPlan := &dbent.SubscriptionPlan{Price: 60, ValidityDays: 30, ValidityUnit: "day"}
+	now := time.Now()
+	monthly, weekly := 100.0, 50.0
+	window := now.AddDate(0, 0, -3)
+	sub := newSubWithRemainingDays(15)
+	sub.Group = &Group{MonthlyLimitUSD: &monthly, WeeklyLimitUSD: &weekly}
+	sub.MonthlyWindowStart = &window
+	sub.WeeklyWindowStart = &window
+	sub.MonthlyUsageUSD = 20
+	sub.WeeklyUsageUSD = 40
+
+	result, err := ComputeUpgradeProration(oldPlan, newPlan, sub, now)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result.UnusedRatio != 0.8 {
+		t.Errorf("UnusedRatio = %.4f, want 0.8 (monthly only)", result.UnusedRatio)
+	}
+	wantCredit := float64(result.RemainingDays) * 0.8
+	if result.Credit != wantCredit {
+		t.Errorf("Credit = %.2f, want %.2f", result.Credit, wantCredit)
+	}
+}
+
+func TestComputeUpgradeProration_QuotaExhaustedNoCredit(t *testing.T) {
+	// 天数还剩一半，但月额度已用满：不再抵扣，实付等于新套餐价。
+	oldPlan := &dbent.SubscriptionPlan{Price: 30, ValidityDays: 30, ValidityUnit: "day"}
+	newPlan := &dbent.SubscriptionPlan{Price: 60, ValidityDays: 30, ValidityUnit: "day"}
+	now := time.Now()
+	limit := 100.0
+	window := now.AddDate(0, 0, -20)
+	sub := newSubWithRemainingDays(15)
+	sub.Group = &Group{MonthlyLimitUSD: &limit}
+	sub.MonthlyWindowStart = &window
+	sub.MonthlyUsageUSD = 100
+
+	result, err := ComputeUpgradeProration(oldPlan, newPlan, sub, now)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result.RemainingDays == 0 {
+		t.Fatal("RemainingDays = 0, want days still left")
+	}
+	if result.UnusedRatio != 0 {
+		t.Errorf("UnusedRatio = %.4f, want 0", result.UnusedRatio)
+	}
+	if result.Credit != 0 {
+		t.Errorf("Credit = %.2f, want 0", result.Credit)
+	}
+	if result.Payable != 60 {
+		t.Errorf("Payable = %.2f, want 60", result.Payable)
+	}
+}
+
+func TestComputeUpgradeProration_UnstartedWindowIgnored(t *testing.T) {
+	// 限额配了但窗口还没开始：用量尚未产生，不把抵扣打成 0。
+	oldPlan := &dbent.SubscriptionPlan{Price: 30, ValidityDays: 30, ValidityUnit: "day"}
+	newPlan := &dbent.SubscriptionPlan{Price: 60, ValidityDays: 30, ValidityUnit: "day"}
+	now := time.Now()
+	limit := 100.0
+	sub := newSubWithRemainingDays(15)
+	sub.Group = &Group{MonthlyLimitUSD: &limit}
+
+	result, err := ComputeUpgradeProration(oldPlan, newPlan, sub, now)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result.UnusedRatio != 1 {
+		t.Errorf("UnusedRatio = %.4f, want 1", result.UnusedRatio)
+	}
+	if result.Credit != float64(result.RemainingDays) {
+		t.Errorf("Credit = %.2f, want %.2f", result.Credit, float64(result.RemainingDays))
+	}
 }
 
 func TestComputeUpgradeProration_RoundingPrecision(t *testing.T) {
