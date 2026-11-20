@@ -705,7 +705,7 @@ export default {
         imageSizeTiersAtLeastOne: 'Keep at least one tier',
         endpointCapabilities: 'Endpoint capabilities',
         endpointCapabilitiesDesc:
-          'Used by account routing. The text endpoint follows the Responses API support setting above and is shown as Responses, Chat Completions, or auto mode; Embeddings independently controls /v1/embeddings. Messages alone forwards inbound /v1/messages unchanged to this account and does not serve other OpenAI endpoints.',
+          'Used by account routing. The text endpoint follows the Responses API support setting above and is shown as Responses, Chat Completions, or auto mode; Embeddings independently controls /v1/embeddings. Selecting Messages (/v1/messages only) clears the other endpoints, forwards inbound /v1/messages unchanged, and skips the Responses probe.',
         capabilityMessages: 'Messages (/v1/messages only)',
         capabilityResponses: 'Responses',
         capabilityTextAuto: 'Responses / Chat Completions (Auto)',

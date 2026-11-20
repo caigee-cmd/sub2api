@@ -1576,6 +1576,7 @@ import {
   resolveOpenAIWSModeHintKey
 } from '@/utils/openaiWsMode'
 import type { OpenAIWSMode } from '@/utils/openaiWsMode'
+import { normalizeOpenAIEndpointCapabilities as normalizeOpenAIEndpointCapabilitySelection } from '@/utils/openaiEndpointCapabilities'
 interface Props {
   show: boolean
   accountIds: number[]
@@ -1884,11 +1885,8 @@ const openAIResponsesModeApplicable = computed(
   () => !enableOpenAIEndpointCapabilities.value || openAITextGenerationCapabilityEnabled.value
 )
 
-const normalizeOpenAIEndpointCapabilities = (values: OpenAIEndpointCapability[]) => {
-  const allowed: OpenAIEndpointCapability[] = ['chat_completions', 'embeddings', 'messages', 'seedance', 'videos']
-  const selected = allowed.filter((value) => values.includes(value))
-  return selected.length > 0 ? selected : ['chat_completions', 'embeddings'] as OpenAIEndpointCapability[]
-}
+const normalizeOpenAIEndpointCapabilities = (values: OpenAIEndpointCapability[]) =>
+  normalizeOpenAIEndpointCapabilitySelection(values, openAIEndpointCapabilities.value)
 
 const toggleOpenAIEndpointCapability = (
   capability: OpenAIEndpointCapability,

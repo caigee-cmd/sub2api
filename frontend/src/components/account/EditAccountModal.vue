@@ -3612,6 +3612,7 @@ import {
   isOfficialGeminiBaseUrl,
   normalizeExplicitCacheUpstreamMaxTTL
 } from '@/utils/geminiExplicitCache'
+import { normalizeOpenAIEndpointCapabilities as normalizeOpenAIEndpointCapabilitySelection } from '@/utils/openaiEndpointCapabilities'
 import OpenCodeGoProtocolRulesEditor from '@/components/account/OpenCodeGoProtocolRulesEditor.vue'
 import HeaderOverrideEditor from '@/components/account/HeaderOverrideEditor.vue'
 import OllamaCloudUsageSettings from '@/components/account/OllamaCloudUsageSettings.vue'
@@ -4614,11 +4615,8 @@ const openAITextGenerationCapabilityEnabled = computed(() =>
   openAIEndpointCapabilities.value.includes('chat_completions')
 )
 
-const normalizeOpenAIEndpointCapabilities = (values: OpenAIEndpointCapability[]) => {
-  const allowed: OpenAIEndpointCapability[] = ['chat_completions', 'embeddings', 'messages', 'seedance', 'videos']
-  const selected = allowed.filter((value) => values.includes(value))
-  return selected.length > 0 ? selected : ['chat_completions', 'embeddings'] as OpenAIEndpointCapability[]
-}
+const normalizeOpenAIEndpointCapabilities = (values: OpenAIEndpointCapability[]) =>
+  normalizeOpenAIEndpointCapabilitySelection(values, openAIEndpointCapabilities.value)
 
 const readOpenAIEndpointCapabilities = (credentials?: Record<string, unknown>): OpenAIEndpointCapability[] => {
   const raw = credentials?.openai_capabilities

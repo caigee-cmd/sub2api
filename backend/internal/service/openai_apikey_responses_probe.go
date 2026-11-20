@@ -154,6 +154,14 @@ func (s *AccountTestService) ProbeOpenAIAPIKeyResponsesSupport(ctx context.Conte
 		return
 	}
 
+	// 只声明 messages 的账号只承接 /v1/messages，路由直接走 Anthropic，
+	// openai_responses_supported 不可达。探测只会白打一次 /v1/responses，
+	// 且把 false 写进 extra 会在以后改回 chat/responses 时变成粘住的错误结论。
+	// 同时声明 chat_completions 时 OpenAIMessagesOnly 为 false，仍要探测。
+	if account.OpenAIMessagesOnly() {
+		return
+	}
+
 	// force_responses / force_chat_completions 下 ResolveResponsesSupport 优先读 mode，探测标记不可达，探测只会白跑一次上游调用，直接跳过。
 	if mode, _ := account.Extra[openai_compat.ExtraKeyResponsesMode].(string); openai_compat.NormalizeResponsesSupportMode(mode) != openai_compat.ResponsesSupportModeAuto {
 		return
