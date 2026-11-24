@@ -237,7 +237,7 @@ func (s *OpenAIGatewayService) ForwardOpenAIVideos(
 	} else {
 		req.Header.Set("Accept", "application/json")
 	}
-	account.ApplyHeaderOverrides(req.Header)
+		account.ApplyHeaderOverrides(req.Context(), req.Header)
 
 	proxy := ""
 	if account.ProxyID != nil && account.Proxy != nil {
